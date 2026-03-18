@@ -1,10 +1,12 @@
 const Router = {
   getCurrentPage() {
-    const path = window.location.pathname;
+    const hash = window.location.hash.replace("#", "");
 
-    if (path.includes("dashboard")) return "dashboard";
-    if (path.includes("documents")) return "documents";
-    if (path.includes("inventory")) return "inventory";
+    if (!hash) return "dashboard";
+
+    if (hash === "dashboard") return "dashboard";
+    if (hash === "documents") return "documents";
+    if (hash === "inventory") return "inventory";
 
     return "dashboard";
   }
