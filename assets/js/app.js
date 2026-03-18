@@ -1,14 +1,17 @@
-console.log("CHNU app loaded");
 document.addEventListener("DOMContentLoaded", () => {
   console.log("CHNU iniciado");
 
   const app = document.getElementById("app");
 
-  const currentPage = Router.getCurrentPage();
+  function loadApp() {
+    const currentPage = Router.getCurrentPage();
+    console.log("Página atual:", currentPage);
+    renderPage(app, currentPage);
+  }
 
-  console.log("Página atual:", currentPage);
+  loadApp();
 
-  renderPage(app, currentPage);
+  window.addEventListener("hashchange", loadApp);
 });
 
 function renderPage(app, page) {
@@ -17,13 +20,13 @@ function renderPage(app, page) {
       
       <aside class="sidebar">
         <h2>CHNU</h2>
-       <nav>
-  <ul>
-    <li><a href="#dashboard" class="${page === "dashboard" ? "active" : ""}">Dashboard</a></li>
-    <li><a href="#documents" class="${page === "documents" ? "active" : ""}">Documents</a></li>
-    <li><a href="#inventory" class="${page === "inventory" ? "active" : ""}">Inventory</a></li>
-  </ul>
-</nav>
+        <nav>
+          <ul>
+            <li><a href="#dashboard" class="${page === "dashboard" ? "active" : ""}">Dashboard</a></li>
+            <li><a href="#documents" class="${page === "documents" ? "active" : ""}">Documents</a></li>
+            <li><a href="#inventory" class="${page === "inventory" ? "active" : ""}">Inventory</a></li>
+          </ul>
+        </nav>
       </aside>
 
       <div class="app-main">
