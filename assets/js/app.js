@@ -12,20 +12,48 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function renderPage(app, page) {
+  app.innerHTML = `
+    <div class="app-shell">
+      
+      <aside class="sidebar">
+        <h2>CHNU</h2>
+        <nav>
+          <ul>
+            <li><a href="#">Dashboard</a></li>
+            <li><a href="#">Documents</a></li>
+            <li><a href="#">Inventory</a></li>
+          </ul>
+        </nav>
+      </aside>
+
+      <div class="app-main">
+        
+        <header class="topbar">
+          <h1>${page.toUpperCase()}</h1>
+        </header>
+
+        <main class="page-content">
+          ${renderContent(page)}
+        </main>
+
+      </div>
+
+    </div>
+  `;
+}
+
+function renderContent(page) {
   switch (page) {
     case "dashboard":
-      app.innerHTML = "<h1>Dashboard CHNU</h1>";
-      break;
+      return "<p>Bem-vinda ao CHNU 🚀</p>";
 
     case "documents":
-      app.innerHTML = "<h1>Documents CHNU</h1>";
-      break;
+      return "<p>Gestão de documentos</p>";
 
     case "inventory":
-      app.innerHTML = "<h1>Inventory CHNU</h1>";
-      break;
+      return "<p>Controlo de stock</p>";
 
     default:
-      app.innerHTML = "<h1>CHNU</h1>";
+      return "<p>CHNU</p>";
   }
 }
