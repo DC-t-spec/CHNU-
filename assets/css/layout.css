@@ -54,3 +54,8 @@ body {
   background: #f5f5f5;
   flex: 1;
 }
+
+.sidebar a.active {
+  color: #ffffff;
+  font-weight: 700;
+}
