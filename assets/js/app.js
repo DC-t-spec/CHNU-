@@ -17,13 +17,13 @@ function renderPage(app, page) {
       
       <aside class="sidebar">
         <h2>CHNU</h2>
-        <nav>
-          <ul>
-            <li><a href="#">Dashboard</a></li>
-            <li><a href="#">Documents</a></li>
-            <li><a href="#">Inventory</a></li>
-          </ul>
-        </nav>
+       <nav>
+  <ul>
+    <li><a href="#dashboard" class="${page === "dashboard" ? "active" : ""}">Dashboard</a></li>
+    <li><a href="#documents" class="${page === "documents" ? "active" : ""}">Documents</a></li>
+    <li><a href="#inventory" class="${page === "inventory" ? "active" : ""}">Inventory</a></li>
+  </ul>
+</nav>
       </aside>
 
       <div class="app-main">
