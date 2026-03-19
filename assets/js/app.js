@@ -9,7 +9,16 @@ document.addEventListener("DOMContentLoaded", () => {
     renderPage(app, currentPage);
   }
 
+  function refreshCurrentPage() {
+    const currentPage = Router.getCurrentPage();
+    renderPage(app, currentPage);
+  }
+
   loadApp();
+
+  app.addEventListener("click", (event) => {
+    handleAppClick(event, refreshCurrentPage);
+  });
 
   window.addEventListener("hashchange", loadApp);
 });
@@ -100,6 +109,102 @@ case "documents":
     default:
       return "<p>CHNU</p>";
   }
+}
+
+function handleAppClick(event, refreshCurrentPage) {
+  const actionButton = event.target.closest("[data-action]");
+
+  if (!actionButton) return;
+
+  const action = actionButton.dataset.action;
+  const documentId = actionButton.dataset.id;
+
+  if (!action || !documentId) return;
+
+  if (action === "view-document") {
+    handleViewDocument(documentId);
+    return;
+  }
+
+  if (action === "edit-document") {
+    handleEditDocument(documentId, refreshCurrentPage);
+    return;
+  }
+
+  if (action === "cancel-document") {
+    handleCancelDocument(documentId, refreshCurrentPage);
+    return;
+  }
+}
+
+function getDocumentById(documentId) {
+  return documentsState.items.find((doc) => doc.id === documentId);
+}
+
+function handleViewDocument(documentId) {
+  const documentItem = getDocumentById(documentId);
+
+  if (!documentItem) {
+    alert("Documento não encontrado.");
+    return;
+  }
+
+  alert(
+    [
+      `Número: ${documentItem.number}`,
+      `Data: ${documentItem.date}`,
+      `Tipo: ${documentItem.type}`,
+      `Origem: ${documentItem.origin}`,
+      `Destino: ${documentItem.destination}`,
+      `Status: ${documentItem.status}`
+    ].join("\n")
+  );
+}
+
+function handleEditDocument(documentId, refreshCurrentPage) {
+  const documentItem = getDocumentById(documentId);
+
+  if (!documentItem) {
+    alert("Documento não encontrado.");
+    return;
+  }
+
+  const newType = prompt("Editar tipo do documento:", documentItem.type);
+
+  if (newType === null) return;
+
+  const cleanedType = newType.trim();
+
+  if (!cleanedType) {
+    alert("O tipo do documento não pode ficar vazio.");
+    return;
+  }
+
+  documentItem.type = cleanedType;
+  refreshCurrentPage();
+}
+
+function handleCancelDocument(documentId, refreshCurrentPage) {
+  const documentItem = getDocumentById(documentId);
+
+  if (!documentItem) {
+    alert("Documento não encontrado.");
+    return;
+  }
+
+  if (documentItem.status !== "posted") {
+    alert("Só documentos posted podem ser cancelados.");
+    return;
+  }
+
+  const confirmed = confirm(
+    `Tens a certeza que queres cancelar o documento ${documentItem.number}?`
+  );
+
+  if (!confirmed) return;
+
+  documentItem.status = "cancelled";
+  refreshCurrentPage();
 }
 
 function renderDocumentsPage() {
