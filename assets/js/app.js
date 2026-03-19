@@ -14,6 +14,47 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("hashchange", loadApp);
 });
 
+const documentsState = {
+  items: [
+    {
+      id: "doc-1",
+      number: "DOC-2026-0001",
+      date: "18/03/2026 10:20",
+      type: "Ajuste de Entrada",
+      origin: "Armazém Central",
+      destination: "Loja 1",
+      status: "draft"
+    },
+    {
+      id: "doc-2",
+      number: "DOC-2026-0002",
+      date: "18/03/2026 11:05",
+      type: "Transferência",
+      origin: "Armazém Central",
+      destination: "Filial Matola",
+      status: "posted"
+    },
+    {
+      id: "doc-3",
+      number: "DOC-2026-0003",
+      date: "18/03/2026 12:10",
+      type: "Ajuste de Saída",
+      origin: "Loja 1",
+      destination: "-",
+      status: "cancelled"
+    },
+    {
+      id: "doc-4",
+      number: "DOC-2026-0004",
+      date: "18/03/2026 13:00",
+      type: "Produção",
+      origin: "Fábrica",
+      destination: "Armazém Central",
+      status: "draft"
+    }
+  ]
+};
+
 function renderPage(app, page) {
   app.innerHTML = `
     <div class="app-shell">
@@ -62,11 +103,13 @@ case "documents":
 }
 
 function renderDocumentsPage() {
+  const documents = documentsState.items;
+
   return `
     <section class="page">
       ${renderDocumentsHeader()}
-      ${renderDocumentsStats()}
-      ${renderDocumentsTable()}
+      ${renderDocumentsStats(documents)}
+      ${renderDocumentsTable(documents)}
     </section>
   `;
 }
@@ -87,37 +130,44 @@ function renderDocumentsHeader() {
   `;
 }
 
-function renderDocumentsStats() {
+function renderDocumentsStats(documents) {
+  const draftCount = documents.filter((doc) => doc.status === "draft").length;
+  const postedCount = documents.filter((doc) => doc.status === "posted").length;
+  const cancelledCount = documents.filter((doc) => doc.status === "cancelled").length;
+  const totalCount = documents.length;
+
   return `
     <div class="stat-grid">
       <div class="card stat-card">
         <span class="stat-label">Draft</span>
-        <strong class="stat-value">18</strong>
+        <strong class="stat-value">${draftCount}</strong>
         <span class="stat-meta">Documentos em edição</span>
       </div>
 
       <div class="card stat-card">
         <span class="stat-label">Posted</span>
-        <strong class="stat-value">42</strong>
+        <strong class="stat-value">${postedCount}</strong>
         <span class="stat-meta">Já impactaram stock</span>
       </div>
 
       <div class="card stat-card">
         <span class="stat-label">Cancelled</span>
-        <strong class="stat-value">3</strong>
+        <strong class="stat-value">${cancelledCount}</strong>
         <span class="stat-meta">Revertidos</span>
       </div>
 
       <div class="card stat-card">
         <span class="stat-label">Total</span>
-        <strong class="stat-value">63</strong>
+        <strong class="stat-value">${totalCount}</strong>
         <span class="stat-meta">Registos totais</span>
       </div>
     </div>
   `;
 }
 
-function renderDocumentsTable() {
+function renderDocumentsTable(documents) {
+  const rows = documents.map((doc) => renderDocumentRow(doc)).join("");
+
   return `
     <div class="card table-card">
       <div class="table-wrap">
@@ -133,23 +183,7 @@ function renderDocumentsTable() {
             </tr>
           </thead>
           <tbody>
-            ${renderDocumentRow({
-              number: "DOC-2026-0001",
-              date: "18/03/2026 10:20",
-              type: "Ajuste de Entrada",
-              origin: "Armazém Central",
-              destination: "Loja 1",
-              status: "draft"
-            })}
-
-            ${renderDocumentRow({
-              number: "DOC-2026-0002",
-              date: "18/03/2026 11:05",
-              type: "Transferência",
-              origin: "Armazém Central",
-              destination: "Filial Matola",
-              status: "posted"
-            })}
+            ${rows || renderDocumentsEmptyRow()}
           </tbody>
         </table>
       </div>
@@ -157,9 +191,24 @@ function renderDocumentsTable() {
   `;
 }
 
-function renderDocumentRow(doc) {
+function renderDocumentsEmptyRow() {
   return `
     <tr>
+      <td colspan="6">
+        <div class="empty-state">
+          <div class="empty-state__title">Sem documentos</div>
+          <div class="empty-state__text">
+            Ainda não existem documentos registados nesta secção.
+          </div>
+        </div>
+      </td>
+    </tr>
+  `;
+}
+
+function renderDocumentRow(doc) {
+  return `
+    <tr data-document-id="${doc.id}">
       <td>
         <div class="cell-title">${doc.number}</div>
         <div class="cell-subtitle">${doc.date}</div>
@@ -170,11 +219,40 @@ function renderDocumentRow(doc) {
       <td>${renderStatusBadge(doc.status)}</td>
       <td>
         <div class="cell-actions">
-          <button class="btn btn--sm btn--ghost">Ver</button>
+          <button 
+            class="btn btn--sm btn--ghost"
+            data-action="view-document"
+            data-id="${doc.id}"
+          >
+            Ver
+          </button>
+
           ${
             doc.status === "draft"
-              ? `<button class="btn btn--sm btn--secondary">Editar</button>`
-              : `<button class="btn btn--sm btn--danger">Cancelar</button>`
+              ? `
+                <button 
+                  class="btn btn--sm btn--secondary"
+                  data-action="edit-document"
+                  data-id="${doc.id}"
+                >
+                  Editar
+                </button>
+              `
+              : ""
+          }
+
+          ${
+            doc.status === "posted"
+              ? `
+                <button 
+                  class="btn btn--sm btn--danger"
+                  data-action="cancel-document"
+                  data-id="${doc.id}"
+                >
+                  Cancelar
+                </button>
+              `
+              : ""
           }
         </div>
       </td>
