@@ -20,10 +20,27 @@ document.addEventListener("DOMContentLoaded", () => {
     handleAppClick(event, refreshCurrentPage);
   });
 
+  app.addEventListener("input", (event) => {
+    handleAppInput(event, refreshCurrentPage);
+  });
+
+  app.addEventListener("change", (event) => {
+    handleAppChange(event, refreshCurrentPage);
+  });
+
   window.addEventListener("hashchange", loadApp);
 });
 
+/* =========================================================
+   STATE
+   ========================================================= */
+
 const documentsState = {
+  filters: {
+    search: "",
+    status: "all"
+  },
+
   items: [
     {
       id: "doc-1",
@@ -60,14 +77,26 @@ const documentsState = {
       origin: "Fábrica",
       destination: "Armazém Central",
       status: "draft"
+    },
+    {
+      id: "doc-5",
+      number: "DOC-2026-0005",
+      date: "18/03/2026 14:30",
+      type: "Transferência",
+      origin: "Filial Matola",
+      destination: "Loja 1",
+      status: "posted"
     }
   ]
 };
 
+/* =========================================================
+   APP RENDER
+   ========================================================= */
+
 function renderPage(app, page) {
   app.innerHTML = `
     <div class="app-shell">
-      
       <aside class="sidebar">
         <h2>CHNU</h2>
         <nav>
@@ -80,7 +109,6 @@ function renderPage(app, page) {
       </aside>
 
       <div class="app-main">
-        
         <header class="topbar">
           <h1>${page.toUpperCase()}</h1>
         </header>
@@ -88,9 +116,7 @@ function renderPage(app, page) {
         <main class="page-content">
           ${renderContent(page)}
         </main>
-
       </div>
-
     </div>
   `;
 }
@@ -98,18 +124,52 @@ function renderPage(app, page) {
 function renderContent(page) {
   switch (page) {
     case "dashboard":
-      return "<p>Bem-vinda ao CHNU 🚀</p>";
+      return `
+        <section class="page">
+          <div class="page-header">
+            <div class="page-header__content">
+              <h1 class="page-title">Dashboard</h1>
+              <p class="page-subtitle">Visão geral do sistema CHNU.</p>
+            </div>
+          </div>
 
-case "documents":
-  return renderDocumentsPage();
+          <div class="card">
+            <div class="card-body">
+              <p>Bem-vinda ao CHNU 🚀</p>
+            </div>
+          </div>
+        </section>
+      `;
+
+    case "documents":
+      return renderDocumentsPage();
 
     case "inventory":
-      return "<p>Controlo de stock</p>";
+      return `
+        <section class="page">
+          <div class="page-header">
+            <div class="page-header__content">
+              <h1 class="page-title">Inventory</h1>
+              <p class="page-subtitle">Controlo de stock e movimentos.</p>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-body">
+              <p>Controlo de stock</p>
+            </div>
+          </div>
+        </section>
+      `;
 
     default:
-      return "<p>CHNU</p>";
+      return `<p>CHNU</p>`;
   }
 }
+
+/* =========================================================
+   GLOBAL EVENTS
+   ========================================================= */
 
 function handleAppClick(event, refreshCurrentPage) {
   const actionButton = event.target.closest("[data-action]");
@@ -117,9 +177,26 @@ function handleAppClick(event, refreshCurrentPage) {
   if (!actionButton) return;
 
   const action = actionButton.dataset.action;
-  const documentId = actionButton.dataset.id;
+  const documentId = actionButton.dataset.id || "";
 
-  if (!action || !documentId) return;
+  if (action === "clear-document-filters") {
+    documentsState.filters.search = "";
+    documentsState.filters.status = "all";
+    refreshCurrentPage();
+    return;
+  }
+
+  if (action === "new-document") {
+    handleNewDocument(refreshCurrentPage);
+    return;
+  }
+
+  if (action === "import-documents") {
+    alert("Importação será ligada numa fase seguinte.");
+    return;
+  }
+
+  if (!documentId) return;
 
   if (action === "view-document") {
     handleViewDocument(documentId);
@@ -131,14 +208,145 @@ function handleAppClick(event, refreshCurrentPage) {
     return;
   }
 
+  if (action === "post-document") {
+    handlePostDocument(documentId, refreshCurrentPage);
+    return;
+  }
+
   if (action === "cancel-document") {
     handleCancelDocument(documentId, refreshCurrentPage);
-    return;
   }
 }
 
+function handleAppInput(event, refreshCurrentPage) {
+  const target = event.target;
+
+  if (target.matches("[data-filter='documents-search']")) {
+    documentsState.filters.search = target.value;
+    refreshCurrentPage();
+  }
+}
+
+function handleAppChange(event, refreshCurrentPage) {
+  const target = event.target;
+
+  if (target.matches("[data-filter='documents-status']")) {
+    documentsState.filters.status = target.value;
+    refreshCurrentPage();
+  }
+}
+
+/* =========================================================
+   DOCUMENTS — HELPERS
+   ========================================================= */
+
 function getDocumentById(documentId) {
   return documentsState.items.find((doc) => doc.id === documentId);
+}
+
+function getFilteredDocuments() {
+  const search = documentsState.filters.search.trim().toLowerCase();
+  const status = documentsState.filters.status;
+
+  return documentsState.items.filter((doc) => {
+    const matchesStatus = status === "all" ? true : doc.status === status;
+
+    const haystack = [
+      doc.number,
+      doc.type,
+      doc.origin,
+      doc.destination,
+      doc.status,
+      doc.date
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    const matchesSearch = search ? haystack.includes(search) : true;
+
+    return matchesStatus && matchesSearch;
+  });
+}
+
+function getDocumentsStats(documents) {
+  return {
+    draft: documents.filter((doc) => doc.status === "draft").length,
+    posted: documents.filter((doc) => doc.status === "posted").length,
+    cancelled: documents.filter((doc) => doc.status === "cancelled").length,
+    total: documents.length
+  };
+}
+
+function generateNextDocumentNumber() {
+  const prefix = "DOC-2026-";
+  const numbers = documentsState.items
+    .map((doc) => {
+      const parts = doc.number.split(prefix);
+      return parts[1] ? Number(parts[1]) : 0;
+    })
+    .filter((n) => !Number.isNaN(n));
+
+  const maxNumber = numbers.length ? Math.max(...numbers) : 0;
+  const nextNumber = String(maxNumber + 1).padStart(4, "0");
+
+  return `${prefix}${nextNumber}`;
+}
+
+function getCurrentDateTimeString() {
+  const now = new Date();
+
+  const day = String(now.getDate()).padStart(2, "0");
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const year = now.getFullYear();
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+
+  return `${day}/${month}/${year} ${hours}:${minutes}`;
+}
+
+/* =========================================================
+   DOCUMENTS — ACTIONS
+   ========================================================= */
+
+function handleNewDocument(refreshCurrentPage) {
+  const type = prompt("Tipo do novo documento:", "Transferência");
+  if (type === null) return;
+
+  const cleanedType = type.trim();
+  if (!cleanedType) {
+    alert("O tipo do documento é obrigatório.");
+    return;
+  }
+
+  const origin = prompt("Origem:", "Armazém Central");
+  if (origin === null) return;
+
+  const cleanedOrigin = origin.trim();
+  if (!cleanedOrigin) {
+    alert("A origem é obrigatória.");
+    return;
+  }
+
+  const destination = prompt("Destino:", "Loja 1");
+  if (destination === null) return;
+
+  const cleanedDestination = destination.trim();
+  if (!cleanedDestination) {
+    alert("O destino é obrigatório.");
+    return;
+  }
+
+  documentsState.items.unshift({
+    id: `doc-${Date.now()}`,
+    number: generateNextDocumentNumber(),
+    date: getCurrentDateTimeString(),
+    type: cleanedType,
+    origin: cleanedOrigin,
+    destination: cleanedDestination,
+    status: "draft"
+  });
+
+  refreshCurrentPage();
 }
 
 function handleViewDocument(documentId) {
@@ -169,18 +377,44 @@ function handleEditDocument(documentId, refreshCurrentPage) {
     return;
   }
 
-  const newType = prompt("Editar tipo do documento:", documentItem.type);
+  if (documentItem.status !== "draft") {
+    alert("Só documentos draft podem ser editados.");
+    return;
+  }
 
+  const newType = prompt("Editar tipo do documento:", documentItem.type);
   if (newType === null) return;
 
   const cleanedType = newType.trim();
-
   if (!cleanedType) {
     alert("O tipo do documento não pode ficar vazio.");
     return;
   }
 
   documentItem.type = cleanedType;
+  refreshCurrentPage();
+}
+
+function handlePostDocument(documentId, refreshCurrentPage) {
+  const documentItem = getDocumentById(documentId);
+
+  if (!documentItem) {
+    alert("Documento não encontrado.");
+    return;
+  }
+
+  if (documentItem.status !== "draft") {
+    alert("Só documentos draft podem ser posted.");
+    return;
+  }
+
+  const confirmed = confirm(
+    `Confirmas o post do documento ${documentItem.number}?`
+  );
+
+  if (!confirmed) return;
+
+  documentItem.status = "posted";
   refreshCurrentPage();
 }
 
@@ -207,14 +441,19 @@ function handleCancelDocument(documentId, refreshCurrentPage) {
   refreshCurrentPage();
 }
 
+/* =========================================================
+   DOCUMENTS — RENDER
+   ========================================================= */
+
 function renderDocumentsPage() {
-  const documents = documentsState.items;
+  const filteredDocuments = getFilteredDocuments();
 
   return `
-    <section class="page">
+    <section class="page documents-page">
       ${renderDocumentsHeader()}
-      ${renderDocumentsStats(documents)}
-      ${renderDocumentsTable(documents)}
+      ${renderDocumentsToolbar()}
+      ${renderDocumentsStats(filteredDocuments)}
+      ${renderDocumentsTable(filteredDocuments)}
     </section>
   `;
 }
@@ -228,43 +467,86 @@ function renderDocumentsHeader() {
       </div>
 
       <div class="button-group">
-        <button class="btn btn--secondary">Importar</button>
-        <button class="btn btn--primary">Novo Documento</button>
+        <button class="btn btn--secondary" data-action="import-documents">
+          Importar
+        </button>
+        <button class="btn btn--primary" data-action="new-document">
+          Novo Documento
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function renderDocumentsToolbar() {
+  return `
+    <div class="card">
+      <div class="toolbar">
+        <div class="toolbar__left" style="flex: 1;">
+          <div class="field" style="min-width: 260px; flex: 1;">
+            <label class="field-label" for="documents-search">Pesquisar</label>
+            <input
+              id="documents-search"
+              class="input"
+              type="text"
+              placeholder="Número, tipo, origem, destino..."
+              value="${escapeHtml(documentsState.filters.search)}"
+              data-filter="documents-search"
+            />
+          </div>
+
+          <div class="field" style="min-width: 200px;">
+            <label class="field-label" for="documents-status">Status</label>
+            <select
+              id="documents-status"
+              class="select"
+              data-filter="documents-status"
+            >
+              <option value="all" ${documentsState.filters.status === "all" ? "selected" : ""}>Todos</option>
+              <option value="draft" ${documentsState.filters.status === "draft" ? "selected" : ""}>Draft</option>
+              <option value="posted" ${documentsState.filters.status === "posted" ? "selected" : ""}>Posted</option>
+              <option value="cancelled" ${documentsState.filters.status === "cancelled" ? "selected" : ""}>Cancelled</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="toolbar__right">
+          <button class="btn btn--ghost" data-action="clear-document-filters">
+            Limpar filtros
+          </button>
+        </div>
       </div>
     </div>
   `;
 }
 
 function renderDocumentsStats(documents) {
-  const draftCount = documents.filter((doc) => doc.status === "draft").length;
-  const postedCount = documents.filter((doc) => doc.status === "posted").length;
-  const cancelledCount = documents.filter((doc) => doc.status === "cancelled").length;
-  const totalCount = documents.length;
+  const stats = getDocumentsStats(documents);
 
   return `
     <div class="stat-grid">
       <div class="card stat-card">
         <span class="stat-label">Draft</span>
-        <strong class="stat-value">${draftCount}</strong>
+        <strong class="stat-value">${stats.draft}</strong>
         <span class="stat-meta">Documentos em edição</span>
       </div>
 
       <div class="card stat-card">
         <span class="stat-label">Posted</span>
-        <strong class="stat-value">${postedCount}</strong>
+        <strong class="stat-value">${stats.posted}</strong>
         <span class="stat-meta">Já impactaram stock</span>
       </div>
 
       <div class="card stat-card">
         <span class="stat-label">Cancelled</span>
-        <strong class="stat-value">${cancelledCount}</strong>
+        <strong class="stat-value">${stats.cancelled}</strong>
         <span class="stat-meta">Revertidos</span>
       </div>
 
       <div class="card stat-card">
         <span class="stat-label">Total</span>
-        <strong class="stat-value">${totalCount}</strong>
-        <span class="stat-meta">Registos totais</span>
+        <strong class="stat-value">${stats.total}</strong>
+        <span class="stat-meta">Registos visíveis</span>
       </div>
     </div>
   `;
@@ -303,7 +585,7 @@ function renderDocumentsEmptyRow() {
         <div class="empty-state">
           <div class="empty-state__title">Sem documentos</div>
           <div class="empty-state__text">
-            Ainda não existem documentos registados nesta secção.
+            Nenhum documento corresponde aos filtros aplicados.
           </div>
         </div>
       </td>
@@ -315,16 +597,16 @@ function renderDocumentRow(doc) {
   return `
     <tr data-document-id="${doc.id}">
       <td>
-        <div class="cell-title">${doc.number}</div>
-        <div class="cell-subtitle">${doc.date}</div>
+        <div class="cell-title">${escapeHtml(doc.number)}</div>
+        <div class="cell-subtitle">${escapeHtml(doc.date)}</div>
       </td>
-      <td>${doc.type}</td>
-      <td>${doc.origin}</td>
-      <td>${doc.destination}</td>
+      <td>${escapeHtml(doc.type)}</td>
+      <td>${escapeHtml(doc.origin)}</td>
+      <td>${escapeHtml(doc.destination)}</td>
       <td>${renderStatusBadge(doc.status)}</td>
       <td>
         <div class="cell-actions">
-          <button 
+          <button
             class="btn btn--sm btn--ghost"
             data-action="view-document"
             data-id="${doc.id}"
@@ -335,12 +617,20 @@ function renderDocumentRow(doc) {
           ${
             doc.status === "draft"
               ? `
-                <button 
+                <button
                   class="btn btn--sm btn--secondary"
                   data-action="edit-document"
                   data-id="${doc.id}"
                 >
                   Editar
+                </button>
+
+                <button
+                  class="btn btn--sm btn--primary"
+                  data-action="post-document"
+                  data-id="${doc.id}"
+                >
+                  Postar
                 </button>
               `
               : ""
@@ -349,7 +639,7 @@ function renderDocumentRow(doc) {
           ${
             doc.status === "posted"
               ? `
-                <button 
+                <button
                   class="btn btn--sm btn--danger"
                   data-action="cancel-document"
                   data-id="${doc.id}"
@@ -378,5 +668,18 @@ function renderStatusBadge(status) {
     return `<span class="badge badge--cancelled">Cancelled</span>`;
   }
 
-  return `<span class="badge badge--neutral">${status}</span>`;
+  return `<span class="badge badge--neutral">${escapeHtml(status)}</span>`;
+}
+
+/* =========================================================
+   UTILS
+   ========================================================= */
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
