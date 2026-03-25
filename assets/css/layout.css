@@ -186,3 +186,8 @@ body {
     align-items: stretch;
   }
 }
+.main-content {
+  flex: 1;
+  padding: 32px;
+  background: var(--color-bg-app);
+}
