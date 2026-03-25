@@ -9,11 +9,25 @@ export async function renderDocumentsListPage() {
       <div class="page-header">
         <div>
           <h1>Documentos</h1>
-          <p>Gestão de documentos operacionais</p>
+          <p>Gestão de documentos operacionais do sistema</p>
         </div>
 
         <div class="page-actions">
           <a href="#documents/new" class="btn btn-primary">Novo documento</a>
+        </div>
+      </div>
+
+      <div class="card toolbar-card">
+        <div class="toolbar">
+          <div class="toolbar__group">
+            <span class="toolbar__label">Módulo</span>
+            <strong class="toolbar__value">Documents</strong>
+          </div>
+
+          <div class="toolbar__group">
+            <span class="toolbar__label">Total</span>
+            <strong class="toolbar__value">${documents.length}</strong>
+          </div>
         </div>
       </div>
 
@@ -37,7 +51,7 @@ export async function renderDocumentsListPage() {
                   ? documents.map((doc) => `
                     <tr>
                       <td>${doc.number}</td>
-                      <td>${doc.date}</td>
+                      <td>${formatDocumentDate(doc.date)}</td>
                       <td>${doc.type}</td>
                       <td>${doc.origin}</td>
                       <td>${doc.destination}</td>
@@ -48,10 +62,10 @@ export async function renderDocumentsListPage() {
                       </td>
                       <td>
                         <div class="table-actions">
-                          <a href="#documents/view?id=${doc.id}" class="btn btn-sm">Ver</a>
+                          <a href="#documents/view?id=${doc.id}" class="btn btn-sm btn-secondary">Ver</a>
                           ${
                             doc.status === 'draft'
-                              ? `<a href="#documents/edit?id=${doc.id}" class="btn btn-sm btn-secondary">Editar</a>`
+                              ? `<a href="#documents/edit?id=${doc.id}" class="btn btn-sm btn-primary">Editar</a>`
                               : ''
                           }
                         </div>
@@ -72,4 +86,13 @@ export async function renderDocumentsListPage() {
       </div>
     </section>
   `;
+}
+
+function formatDocumentDate(value) {
+  if (!value) return '-';
+
+  const [year, month, day] = value.split('-');
+  if (!year || !month || !day) return value;
+
+  return `${day}/${month}/${year}`;
 }
