@@ -8,6 +8,22 @@ const state = {
       origin: 'Armazém Central',
       destination: 'Loja 1',
       status: 'draft',
+      lines: [
+        createDocumentLine({
+          item: 'Produto A',
+          quantity: 2,
+          unitPrice: 1500,
+        }),
+        createDocumentLine({
+          item: 'Produto B',
+          quantity: 1,
+          unitPrice: 2500,
+        }),
+      ],
+      totals: {
+        linesCount: 2,
+        grandTotal: 5500,
+      },
     },
     {
       id: crypto.randomUUID(),
@@ -17,6 +33,17 @@ const state = {
       origin: 'Armazém Central',
       destination: 'Stock Interno',
       status: 'posted',
+      lines: [
+        createDocumentLine({
+          item: 'Produto C',
+          quantity: 3,
+          unitPrice: 900,
+        }),
+      ],
+      totals: {
+        linesCount: 1,
+        grandTotal: 2700,
+      },
     },
   ],
 };
@@ -42,6 +69,11 @@ export function createDocument(data) {
     origin: data.origin,
     destination: data.destination,
     status: 'draft',
+    lines: [],
+    totals: {
+      linesCount: 0,
+      grandTotal: 0,
+    },
   };
 
   state.documents.unshift(newDocument);
@@ -65,6 +97,113 @@ export function updateDocument(id, data) {
   document.destination = data.destination;
 
   return document;
+}
+
+export function addDocumentLine(documentId, lineData) {
+  const document = getDraftDocumentOrThrow(documentId);
+
+  const newLine = createDocumentLine({
+    item: lineData.item,
+    quantity: Number(lineData.quantity),
+    unitPrice: Number(lineData.unitPrice),
+  });
+
+  document.lines.push(newLine);
+  recalculateDocumentTotals(document);
+
+  return newLine;
+}
+
+export function updateDocumentLine(documentId, lineId, lineData) {
+  const document = getDraftDocumentOrThrow(documentId);
+
+  const line = document.lines.find((entry) => entry.id === lineId);
+
+  if (!line) {
+    throw new Error('Linha não encontrada.');
+  }
+
+  line.item = lineData.item;
+  line.quantity = Number(lineData.quantity);
+  line.unitPrice = Number(lineData.unitPrice);
+  line.total = calculateLineTotal(line.quantity, line.unitPrice);
+
+  recalculateDocumentTotals(document);
+
+  return line;
+}
+
+export function removeDocumentLine(documentId, lineId) {
+  const document = getDraftDocumentOrThrow(documentId);
+
+  document.lines = document.lines.filter((entry) => entry.id !== lineId);
+  recalculateDocumentTotals(document);
+}
+
+export function getDocumentLines(documentId) {
+  const document = getDocumentById(documentId);
+
+  if (!document) return [];
+
+  return [...document.lines];
+}
+
+export function getDocumentTotals(documentId) {
+  const document = getDocumentById(documentId);
+
+  if (!document) {
+    return {
+      linesCount: 0,
+      grandTotal: 0,
+    };
+  }
+
+  return { ...document.totals };
+}
+
+function getDraftDocumentOrThrow(documentId) {
+  const document = getDocumentById(documentId);
+
+  if (!document) {
+    throw new Error('Documento não encontrado.');
+  }
+
+  if (document.status !== 'draft') {
+    throw new Error('Apenas documentos em draft podem ser alterados.');
+  }
+
+  return document;
+}
+
+function createDocumentLine({ item, quantity, unitPrice }) {
+  const safeQuantity = Number(quantity) || 0;
+  const safeUnitPrice = Number(unitPrice) || 0;
+
+  return {
+    id: crypto.randomUUID(),
+    item: item || '',
+    quantity: safeQuantity,
+    unitPrice: safeUnitPrice,
+    total: calculateLineTotal(safeQuantity, safeUnitPrice),
+  };
+}
+
+function calculateLineTotal(quantity, unitPrice) {
+  return Number(quantity) * Number(unitPrice);
+}
+
+function recalculateDocumentTotals(document) {
+  const linesCount = document.lines.length;
+  const grandTotal = document.lines.reduce((sum, line) => {
+    return sum + Number(line.total || 0);
+  }, 0);
+
+  document.totals = {
+    linesCount,
+    grandTotal,
+  };
+
+  return document.totals;
 }
 
 function generateDocumentNumber() {
