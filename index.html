@@ -7,26 +7,42 @@
   <title>CHNU</title>
 
   <!-- CSS BASE -->
- <link rel="stylesheet" href="./assets/css/tokens.css" />
-<link rel="stylesheet" href="./assets/css/base.css" />
-<link rel="stylesheet" href="./assets/css/layout.css" />
-<link rel="stylesheet" href="./assets/css/components.css" />
-<link rel="stylesheet" href="./assets/css/modules/documents.css" />
-<link rel="stylesheet" href="./assets/css/modules/inventory.css" />
+  <link rel="stylesheet" href="./assets/css/tokens.css" />
+  <link rel="stylesheet" href="./assets/css/base.css" />
+  <link rel="stylesheet" href="./assets/css/layout.css" />
+  <link rel="stylesheet" href="./assets/css/components.css" />
+  <link rel="stylesheet" href="./assets/css/modules/documents.css" />
+  <link rel="stylesheet" href="./assets/css/modules/inventory.css" />
 </head>
 
 <body>
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="sidebar__brand">
+        <h1>CHNU</h1>
+      </div>
 
-  <div id="app"></div>
+      <nav class="sidebar__nav">
+        <a href="#dashboard" class="sidebar__link">Dashboard</a>
+        <a href="#documents" class="sidebar__link">Documentos</a>
+        <a href="#documents/new" class="sidebar__link">Novo Documento</a>
+      </nav>
+    </aside>
 
-  <!-- JS CORE -->
-  <script src="assets/js/core/config.js"></script>
-  <script src="assets/js/core/helpers.js"></script>
-  <script src="assets/js/core/state.js"></script>
-  <script src="assets/js/core/router.js"></script>
+    <div class="app-main">
+      <header class="topbar">
+        <div class="topbar__title">
+          <span>Sistema ERP/Admin</span>
+        </div>
+      </header>
 
-  <!-- APP -->
-  <script src="assets/js/app.js"></script>
+      <main class="main-content">
+        <div id="app"></div>
+      </main>
+    </div>
+  </div>
 
+  <!-- APP ENTRY -->
+  <script type="module" src="./assets/js/app.js"></script>
 </body>
 </html>
