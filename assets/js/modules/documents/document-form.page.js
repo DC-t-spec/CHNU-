@@ -3,6 +3,10 @@ import {
   createDocument,
   updateDocument,
 } from '../../core/state.js';
+import {
+  bindDocumentLinesEvents,
+  renderDocumentLinesSection,
+} from './document-lines.js';
 
 export async function renderDocumentFormPage({ route, params }) {
   const appRoot = document.querySelector('#app');
@@ -53,6 +57,11 @@ export async function renderDocumentFormPage({ route, params }) {
 
         <div class="page-actions">
           <a href="#documents" class="btn btn-secondary">Cancelar</a>
+          ${
+            isEditMode
+              ? `<a href="#documents/view?id=${existingDocument.id}" class="btn btn-secondary">Ver detalhe</a>`
+              : ''
+          }
         </div>
       </div>
 
@@ -87,10 +96,25 @@ export async function renderDocumentFormPage({ route, params }) {
           </div>
         </form>
       </div>
+
+      ${
+        isEditMode
+          ? renderDocumentLinesSection(existingDocument)
+          : `
+            <div class="card">
+              <h2>Linhas do documento</h2>
+              <p>Primeiro cria o documento. Depois poderás adicionar linhas e calcular totais.</p>
+            </div>
+          `
+      }
     </section>
   `;
 
   bindDocumentForm();
+
+  if (isEditMode) {
+    bindDocumentLinesEvents(existingDocument.id);
+  }
 }
 
 function bindDocumentForm() {
@@ -124,5 +148,5 @@ function handleDocumentSubmit(event) {
   }
 
   const createdDocument = createDocument(payload);
-  window.location.hash = `#documents/view?id=${createdDocument.id}`;
+  window.location.hash = `#documents/edit?id=${createdDocument.id}`;
 }
