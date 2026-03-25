@@ -44,9 +44,37 @@ export function resolveRoute(hash = getCurrentHash()) {
   };
 }
 
+function updateSidebarActiveState(route) {
+  const sidebarLinks = document.querySelectorAll('.sidebar__link');
+  if (!sidebarLinks.length) return;
+
+  sidebarLinks.forEach((link) => {
+    link.classList.remove('active');
+
+    const target = link.getAttribute('href');
+    if (!target) return;
+
+    if (target === '#dashboard' && route === '/dashboard') {
+      link.classList.add('active');
+      return;
+    }
+
+    if (target === '#documents' && route.startsWith('/documents') && route !== '/documents/new') {
+      link.classList.add('active');
+      return;
+    }
+
+    if (target === '#documents/new' && route === '/documents/new') {
+      link.classList.add('active');
+    }
+  });
+}
+
 export async function runCurrentRoute() {
   const resolved = resolveRoute();
   const appRoot = document.querySelector('#app');
+
+  updateSidebarActiveState(resolved.route || '');
 
   if (!resolved.handler) {
     if (appRoot) {
