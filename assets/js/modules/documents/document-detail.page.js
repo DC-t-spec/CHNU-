@@ -1,4 +1,6 @@
 import { getDocumentById } from '../../core/state.js';
+import { handleDocumentPosting } from './document-posting.js';
+import { handleDocumentCancel } from './document-cancel.js';
 
 export async function renderDocumentDetailPage({ params }) {
   const appRoot = document.querySelector('#app');
@@ -30,7 +32,17 @@ export async function renderDocumentDetailPage({ params }) {
           <a href="#documents" class="btn btn-secondary">Voltar</a>
           ${
             document.status === 'draft'
-              ? `<a href="#documents/edit?id=${document.id}" class="btn btn-primary">Editar</a>`
+              ? `<a href="#documents/edit?id=${document.id}" class="btn btn-secondary">Editar</a>`
+              : ''
+          }
+          ${
+            document.status === 'draft'
+              ? `<button type="button" class="btn btn-primary" id="post-document-button">Postar documento</button>`
+              : ''
+          }
+          ${
+            document.status === 'posted'
+              ? `<button type="button" class="btn btn-danger" id="cancel-document-button">Cancelar documento</button>`
               : ''
           }
         </div>
@@ -47,6 +59,32 @@ export async function renderDocumentDetailPage({ params }) {
           <span class="status-chip status-${document.status}">
             ${document.status}
           </span>
+        </div>
+      </div>
+
+      <div class="card operational-meta">
+        <div class="section-header">
+          <div>
+            <h2>Informação operacional</h2>
+            <p>Eventos do ciclo de vida do documento</p>
+          </div>
+        </div>
+
+        <div class="operational-meta__grid">
+          <div class="operational-meta__item">
+            <span class="operational-meta__label">Postado em</span>
+            <strong class="operational-meta__value">${formatDateTime(document.postedAt)}</strong>
+          </div>
+
+          <div class="operational-meta__item">
+            <span class="operational-meta__label">Cancelado em</span>
+            <strong class="operational-meta__value">${formatDateTime(document.cancelledAt)}</strong>
+          </div>
+
+          <div class="operational-meta__item operational-meta__item--full">
+            <span class="operational-meta__label">Motivo do cancelamento</span>
+            <strong class="operational-meta__value">${document.cancelReason || '-'}</strong>
+          </div>
         </div>
       </div>
 
@@ -105,6 +143,28 @@ export async function renderDocumentDetailPage({ params }) {
       </div>
     </section>
   `;
+
+  bindDetailActions(document.id, document.status);
+}
+
+function bindDetailActions(documentId, status) {
+  if (status === 'draft') {
+    const postButton = document.querySelector('#post-document-button');
+    if (postButton) {
+      postButton.addEventListener('click', () => {
+        handleDocumentPosting(documentId);
+      });
+    }
+  }
+
+  if (status === 'posted') {
+    const cancelButton = document.querySelector('#cancel-document-button');
+    if (cancelButton) {
+      cancelButton.addEventListener('click', () => {
+        handleDocumentCancel(documentId);
+      });
+    }
+  }
 }
 
 function formatCurrency(value) {
@@ -129,4 +189,16 @@ function formatDocumentDate(value) {
   if (!year || !month || !day) return value;
 
   return `${day}/${month}/${year}`;
+}
+
+function formatDateTime(value) {
+  if (!value) return '-';
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString('pt-PT');
 }
