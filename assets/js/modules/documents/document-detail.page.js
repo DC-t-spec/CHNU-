@@ -3,11 +3,11 @@ import { handleDocumentPosting } from './document-posting.js';
 import { handleDocumentCancel } from './document-cancel.js';
 
 export async function renderDocumentDetailPage({ params }) {
-  const appRoot = document.querySelector('#app');
+  const appRoot = window.document.querySelector('#app');
   const documentId = params.id;
-  const document = getDocumentById(documentId);
+  const documentData = getDocumentById(documentId);
 
-  if (!document) {
+  if (!documentData) {
     appRoot.innerHTML = `
       <section class="page-shell">
         <div class="card">
@@ -24,24 +24,24 @@ export async function renderDocumentDetailPage({ params }) {
     <section class="page-shell document-detail-page">
       <div class="page-header">
         <div>
-          <h1>Documento ${document.number}</h1>
+          <h1>Documento ${documentData.number}</h1>
           <p>Detalhe completo do documento</p>
         </div>
 
         <div class="page-actions">
           <a href="#documents" class="btn btn-secondary">Voltar</a>
           ${
-            document.status === 'draft'
-              ? `<a href="#documents/edit?id=${document.id}" class="btn btn-secondary">Editar</a>`
+            documentData.status === 'draft'
+              ? `<a href="#documents/edit?id=${documentData.id}" class="btn btn-secondary">Editar</a>`
               : ''
           }
           ${
-            document.status === 'draft'
+            documentData.status === 'draft'
               ? `<button type="button" class="btn btn-primary" id="post-document-button">Postar documento</button>`
               : ''
           }
           ${
-            document.status === 'posted'
+            documentData.status === 'posted'
               ? `<button type="button" class="btn btn-danger" id="cancel-document-button">Cancelar documento</button>`
               : ''
           }
@@ -49,15 +49,15 @@ export async function renderDocumentDetailPage({ params }) {
       </div>
 
       <div class="card detail-grid">
-        <div><strong>Número</strong>${document.number}</div>
-        <div><strong>Data</strong>${formatDocumentDate(document.date)}</div>
-        <div><strong>Tipo</strong>${document.type}</div>
-        <div><strong>Origem</strong>${document.origin}</div>
-        <div><strong>Destino</strong>${document.destination}</div>
+        <div><strong>Número</strong>${documentData.number}</div>
+        <div><strong>Data</strong>${formatDocumentDate(documentData.date)}</div>
+        <div><strong>Tipo</strong>${documentData.type}</div>
+        <div><strong>Origem</strong>${documentData.origin}</div>
+        <div><strong>Destino</strong>${documentData.destination}</div>
         <div>
           <strong>Status</strong>
-          <span class="status-chip status-${document.status}">
-            ${document.status}
+          <span class="status-chip status-${documentData.status}">
+            ${documentData.status}
           </span>
         </div>
       </div>
@@ -73,17 +73,17 @@ export async function renderDocumentDetailPage({ params }) {
         <div class="operational-meta__grid">
           <div class="operational-meta__item">
             <span class="operational-meta__label">Postado em</span>
-            <strong class="operational-meta__value">${formatDateTime(document.postedAt)}</strong>
+            <strong class="operational-meta__value">${formatDateTime(documentData.postedAt)}</strong>
           </div>
 
           <div class="operational-meta__item">
             <span class="operational-meta__label">Cancelado em</span>
-            <strong class="operational-meta__value">${formatDateTime(document.cancelledAt)}</strong>
+            <strong class="operational-meta__value">${formatDateTime(documentData.cancelledAt)}</strong>
           </div>
 
           <div class="operational-meta__item operational-meta__item--full">
             <span class="operational-meta__label">Motivo do cancelamento</span>
-            <strong class="operational-meta__value">${document.cancelReason || '-'}</strong>
+            <strong class="operational-meta__value">${documentData.cancelReason || '-'}</strong>
           </div>
         </div>
       </div>
@@ -108,8 +108,8 @@ export async function renderDocumentDetailPage({ params }) {
             </thead>
             <tbody>
               ${
-                document.lines.length
-                  ? document.lines.map((line) => `
+                documentData.lines.length
+                  ? documentData.lines.map((line) => `
                     <tr>
                       <td>${line.item}</td>
                       <td>${formatNumber(line.quantity)}</td>
@@ -132,24 +132,24 @@ export async function renderDocumentDetailPage({ params }) {
         <div class="document-totals">
           <div class="document-totals__item">
             <span class="document-totals__label">Total de linhas</span>
-            <strong class="document-totals__value">${document.totals.linesCount}</strong>
+            <strong class="document-totals__value">${documentData.totals.linesCount}</strong>
           </div>
 
           <div class="document-totals__item document-totals__item--highlight">
             <span class="document-totals__label">Total geral</span>
-            <strong class="document-totals__value">${formatCurrency(document.totals.grandTotal)}</strong>
+            <strong class="document-totals__value">${formatCurrency(documentData.totals.grandTotal)}</strong>
           </div>
         </div>
       </div>
     </section>
   `;
 
-  bindDetailActions(document.id, document.status);
+  bindDetailActions(documentData.id, documentData.status);
 }
 
 function bindDetailActions(documentId, status) {
   if (status === 'draft') {
-    const postButton = document.querySelector('#post-document-button');
+    const postButton = window.document.querySelector('#post-document-button');
     if (postButton) {
       postButton.addEventListener('click', () => {
         handleDocumentPosting(documentId);
@@ -158,7 +158,7 @@ function bindDetailActions(documentId, status) {
   }
 
   if (status === 'posted') {
-    const cancelButton = document.querySelector('#cancel-document-button');
+    const cancelButton = window.document.querySelector('#cancel-document-button');
     if (cancelButton) {
       cancelButton.addEventListener('click', () => {
         handleDocumentCancel(documentId);
