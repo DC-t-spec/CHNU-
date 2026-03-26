@@ -61,27 +61,50 @@ export function getState() {
 export function getDocuments() {
   return [...state.documents];
 }
-export function searchDocuments(filters = {}) {
-  const {
-    query = '',
-    status = 'all',
-  } = filters;
+export function searchDocuments({ query = '', status = '', sortBy = 'date_desc' }) {
+  let results = [...state.documents];
 
-  const normalizedQuery = query.trim().toLowerCase();
+  // FILTRO POR TEXTO
+  if (query) {
+    const q = query.toLowerCase();
 
-  return state.documents.filter((document) => {
-    const matchesStatus =
-      status === 'all' ? true : document.status === status;
+    results = results.filter(documentData =>
+      documentData.number.toLowerCase().includes(q) ||
+      documentData.type.toLowerCase().includes(q) ||
+      (documentData.source || '').toLowerCase().includes(q) ||
+      (documentData.destination || '').toLowerCase().includes(q)
+    );
+  }
 
-    const matchesQuery =
-      !normalizedQuery ||
-      document.number.toLowerCase().includes(normalizedQuery) ||
-      document.type.toLowerCase().includes(normalizedQuery) ||
-      document.origin.toLowerCase().includes(normalizedQuery) ||
-      document.destination.toLowerCase().includes(normalizedQuery);
+  // FILTRO POR STATUS
+  if (status) {
+    results = results.filter(documentData => documentData.status === status);
+  }
 
-    return matchesStatus && matchesQuery;
-  });
+  // ORDENAÇÃO
+  switch (sortBy) {
+    case 'date_desc':
+      results.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      break;
+
+    case 'date_asc':
+      results.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      break;
+
+    case 'number_asc':
+      results.sort((a, b) => a.number.localeCompare(b.number));
+      break;
+
+    case 'number_desc':
+      results.sort((a, b) => b.number.localeCompare(a.number));
+      break;
+
+    default:
+      results.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      break;
+  }
+
+  return results;
 }
 
 export function getDocumentById(id) {
