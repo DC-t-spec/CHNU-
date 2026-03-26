@@ -1,4 +1,6 @@
 import { searchDocuments } from '../../core/state.js';
+import { handleDocumentPosting } from './document-posting.js';
+import { handleDocumentCancel } from './document-cancel.js';
 
 export async function renderDocumentsListPage() {
   const appRoot = document.querySelector('#app');
@@ -83,9 +85,35 @@ export async function renderDocumentsListPage() {
                         <td>
                           <div class="table-actions">
                             <a href="#documents/view?id=${doc.id}" class="btn btn-sm btn-secondary">Ver</a>
+
                             ${
                               doc.status === 'draft'
-                                ? `<a href="#documents/edit?id=${doc.id}" class="btn btn-sm btn-primary">Editar</a>`
+                                ? `
+                                  <a href="#documents/edit?id=${doc.id}" class="btn btn-sm btn-primary">Editar</a>
+                                  <button
+                                    type="button"
+                                    class="btn btn-sm btn-success"
+                                    data-action="post-document"
+                                    data-document-id="${doc.id}"
+                                  >
+                                    Postar
+                                  </button>
+                                `
+                                : ''
+                            }
+
+                            ${
+                              doc.status === 'posted'
+                                ? `
+                                  <button
+                                    type="button"
+                                    class="btn btn-sm btn-danger"
+                                    data-action="cancel-document"
+                                    data-document-id="${doc.id}"
+                                  >
+                                    Cancelar
+                                  </button>
+                                `
                                 : ''
                             }
                           </div>
@@ -114,6 +142,7 @@ export async function renderDocumentsListPage() {
 function bindDocumentsListEvents() {
   const toolbarForm = document.querySelector('#documents-toolbar-form');
   const resetButton = document.querySelector('#documents-reset-filters');
+  const appRoot = document.querySelector('#app');
 
   if (toolbarForm) {
     toolbarForm.addEventListener('submit', handleToolbarSubmit);
@@ -121,6 +150,33 @@ function bindDocumentsListEvents() {
 
   if (resetButton) {
     resetButton.addEventListener('click', handleToolbarReset);
+  }
+
+  if (appRoot) {
+    appRoot.addEventListener('click', handleListActionClick);
+  }
+}
+
+function handleListActionClick(event) {
+  const trigger = event.target.closest('[data-action]');
+  if (!trigger) return;
+
+  const action = trigger.dataset.action;
+  const documentId = trigger.dataset.documentId;
+
+  if (!action || !documentId) return;
+
+  if (action === 'post-document') {
+    handleDocumentPosting(documentId, {
+      redirectTo: 'list',
+    });
+    return;
+  }
+
+  if (action === 'cancel-document') {
+    handleDocumentCancel(documentId, {
+      redirectTo: 'list',
+    });
   }
 }
 
