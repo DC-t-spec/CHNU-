@@ -90,11 +90,26 @@ export async function runCurrentRoute() {
     return;
   }
 
-  await resolved.handler({
-    route: resolved.route,
-    params: resolved.params,
-    segments: resolved.segments,
-  });
+  try {
+    await resolved.handler({
+      route: resolved.route,
+      params: resolved.params,
+      segments: resolved.segments,
+    });
+  } catch (error) {
+    console.error('Erro ao renderizar rota:', error);
+
+    if (appRoot) {
+      appRoot.innerHTML = `
+        <section class="page-shell">
+          <div class="card">
+            <h2>Erro ao abrir a página</h2>
+            <p>${error?.message || 'Ocorreu um erro inesperado ao renderizar a rota.'}</p>
+          </div>
+        </section>
+      `;
+    }
+  }
 }
 
 export async function navigateTo(hash) {
