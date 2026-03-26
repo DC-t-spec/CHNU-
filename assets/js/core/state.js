@@ -61,6 +61,28 @@ export function getState() {
 export function getDocuments() {
   return [...state.documents];
 }
+export function searchDocuments(filters = {}) {
+  const {
+    query = '',
+    status = 'all',
+  } = filters;
+
+  const normalizedQuery = query.trim().toLowerCase();
+
+  return state.documents.filter((document) => {
+    const matchesStatus =
+      status === 'all' ? true : document.status === status;
+
+    const matchesQuery =
+      !normalizedQuery ||
+      document.number.toLowerCase().includes(normalizedQuery) ||
+      document.type.toLowerCase().includes(normalizedQuery) ||
+      document.origin.toLowerCase().includes(normalizedQuery) ||
+      document.destination.toLowerCase().includes(normalizedQuery);
+
+    return matchesStatus && matchesQuery;
+  });
+}
 
 export function getDocumentById(id) {
   return state.documents.find((document) => document.id === id) || null;
