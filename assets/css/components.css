@@ -515,3 +515,49 @@
     width: 100%;
   }
 }
+/* =========================
+   Operational meta
+   ========================= */
+.operational-meta__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.operational-meta__item {
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: #fbfcfe;
+}
+
+.operational-meta__item--full {
+  grid-column: 1 / -1;
+}
+
+.operational-meta__label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.operational-meta__value {
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+  .operational-meta__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .operational-meta__item--full {
+    grid-column: auto;
+  }
+}
