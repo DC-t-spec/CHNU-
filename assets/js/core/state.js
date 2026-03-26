@@ -24,6 +24,9 @@ const state = {
         linesCount: 2,
         grandTotal: 5500,
       },
+      postedAt: null,
+      cancelledAt: null,
+      cancelReason: '',
     },
     {
       id: crypto.randomUUID(),
@@ -44,6 +47,9 @@ const state = {
         linesCount: 1,
         grandTotal: 2700,
       },
+      postedAt: '2026-03-24T10:30:00',
+      cancelledAt: null,
+      cancelReason: '',
     },
   ],
 };
@@ -74,6 +80,9 @@ export function createDocument(data) {
       linesCount: 0,
       grandTotal: 0,
     },
+    postedAt: null,
+    cancelledAt: null,
+    cancelReason: '',
   };
 
   state.documents.unshift(newDocument);
@@ -81,15 +90,7 @@ export function createDocument(data) {
 }
 
 export function updateDocument(id, data) {
-  const document = getDocumentById(id);
-
-  if (!document) {
-    throw new Error('Documento não encontrado.');
-  }
-
-  if (document.status !== 'draft') {
-    throw new Error('Apenas documentos em draft podem ser editados.');
-  }
+  const document = getDraftDocumentOrThrow(id);
 
   document.date = data.date;
   document.type = data.type;
@@ -159,6 +160,45 @@ export function getDocumentTotals(documentId) {
   }
 
   return { ...document.totals };
+}
+
+export function postDocument(documentId) {
+  const document = getDocumentById(documentId);
+
+  if (!document) {
+    throw new Error('Documento não encontrado.');
+  }
+
+  if (document.status !== 'draft') {
+    throw new Error('Apenas documentos em draft podem ser postados.');
+  }
+
+  if (!document.lines.length) {
+    throw new Error('Não é possível postar um documento sem linhas.');
+  }
+
+  document.status = 'posted';
+  document.postedAt = new Date().toISOString();
+
+  return document;
+}
+
+export function cancelDocument(documentId, reason = '') {
+  const document = getDocumentById(documentId);
+
+  if (!document) {
+    throw new Error('Documento não encontrado.');
+  }
+
+  if (document.status !== 'posted') {
+    throw new Error('Apenas documentos em posted podem ser cancelados.');
+  }
+
+  document.status = 'cancelled';
+  document.cancelledAt = new Date().toISOString();
+  document.cancelReason = reason?.trim() || 'Sem motivo informado.';
+
+  return document;
 }
 
 function getDraftDocumentOrThrow(documentId) {
