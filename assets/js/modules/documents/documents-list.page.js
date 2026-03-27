@@ -157,7 +157,7 @@ function bindDocumentsListEvents() {
   }
 }
 
-function handleListActionClick(event) {
+async function handleListActionClick(event) {
   const trigger = event.target.closest('[data-action]');
   if (!trigger) return;
 
@@ -167,14 +167,14 @@ function handleListActionClick(event) {
   if (!action || !documentId) return;
 
   if (action === 'post-document') {
-    handleDocumentPosting(documentId, {
+    await handleDocumentPosting(documentId, {
       redirectTo: 'list',
     });
     return;
   }
 
   if (action === 'cancel-document') {
-    handleDocumentCancel(documentId, {
+    await handleDocumentCancel(documentId, {
       redirectTo: 'list',
     });
   }
