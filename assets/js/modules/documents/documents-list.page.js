@@ -6,7 +6,10 @@ export async function renderDocumentsListPage() {
   const appRoot = document.querySelector('#app');
 
   const filters = getCurrentListFilters();
-  const documents = searchDocuments(filters);
+const documents = searchDocuments({
+  query: filters.query,
+  status: filters.status === 'all' ? null : filters.status,
+});
 
   appRoot.innerHTML = `
     <section class="page-shell documents-page">
