@@ -1,6 +1,7 @@
 import { cancelDocument } from '../../core/state.js';
 import { showConfirm } from '../../ui/confirm.js';
 import { showToast } from '../../ui/toast.js';
+import { showInputModal } from '../../ui/modal.js';
 
 export async function handleDocumentCancel(documentId, options = {}) {
   const {
