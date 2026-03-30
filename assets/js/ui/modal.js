@@ -38,16 +38,24 @@ export function showInputModal({
       resolve(value);
     }
 
-    overlay.addEventListener('click', (event) => {
-      const btn = event.target.closest('[data-action]');
-      if (!btn) return;
+overlay.addEventListener('click', (event) => {
+  const btn = event.target.closest('[data-action]');
 
-      if (btn.dataset.action === 'confirm') {
-        close(input.value);
-      } else {
-        close(null);
-      }
-    });
+  // 👉 clicar fora do modal fecha
+  if (!btn) {
+    if (event.target === overlay) {
+      close(null);
+    }
+    return;
+  }
+
+  if (btn.dataset.action === 'confirm') {
+  close(input.value || '');
+    return;
+  }
+
+  close(null);
+});
 
     window.document.body.appendChild(overlay);
 
