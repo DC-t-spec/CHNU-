@@ -15,9 +15,7 @@ export async function handleDocumentPosting(documentId, options = {}) {
     cancelText: 'Voltar',
   });
 
-  if (!confirmed) {
-    return;
-  }
+  if (!confirmed) return;
 
   try {
     postDocument(documentId);
@@ -33,7 +31,6 @@ export async function handleDocumentPosting(documentId, options = {}) {
     }
 
     if (redirectTo === 'list') {
-      window.location.hash = window.location.hash || '#documents';
       window.dispatchEvent(new HashChangeEvent('hashchange'));
       return;
     }
@@ -41,7 +38,7 @@ export async function handleDocumentPosting(documentId, options = {}) {
     window.location.hash = `#documents/view?id=${documentId}`;
   } catch (error) {
     showToast({
-      message: error.message || 'Não foi possível postar o documento.',
+      message: error.message || 'Erro ao postar documento.',
       type: 'error',
     });
   }
