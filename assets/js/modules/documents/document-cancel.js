@@ -18,13 +18,13 @@ export async function handleDocumentCancel(documentId, options = {}) {
 
   if (!confirmed) return;
 
-  // 👉 TEMPORÁRIO: ainda usamos prompt só para não quebrar fluxo
-const reason = await showInputModal({
-  title: 'Cancelar documento',
-  label: 'Motivo do cancelamento',
-  placeholder: 'Digite o motivo...',
-  confirmText: 'Cancelar documento',
-});
+  const reason = await showInputModal({
+    title: 'Cancelar documento',
+    label: 'Motivo do cancelamento',
+    placeholder: 'Digite o motivo...',
+    confirmText: 'Cancelar documento',
+    cancelText: 'Voltar',
+  });
 
   if (reason === null) return;
 
@@ -37,7 +37,7 @@ const reason = await showInputModal({
   }
 
   try {
-    cancelDocument(documentId, reason);
+    cancelDocument(documentId, reason.trim());
 
     showToast({
       message: 'Documento cancelado com sucesso.',
