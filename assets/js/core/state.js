@@ -1,4 +1,110 @@
 const state = {
+  products: [
+    {
+      id: 'p1',
+      name: 'Produto A',
+      sku: 'SKU-A',
+    },
+    {
+      id: 'p2',
+      name: 'Produto B',
+      sku: 'SKU-B',
+    },
+    {
+      id: 'p3',
+      name: 'Produto C',
+      sku: 'SKU-C',
+    },
+  ],
+
+  warehouses: [
+    {
+      id: 'w1',
+      name: 'Armazém Central',
+    },
+    {
+      id: 'w2',
+      name: 'Loja 1',
+    },
+    {
+      id: 'w3',
+      name: 'Stock Interno',
+    },
+  ],
+
+  stockBalances: [
+    {
+      id: 'sb1',
+      product_id: 'p1',
+      warehouse_id: 'w1',
+      qty_on_hand: 12,
+      qty_reserved: 2,
+      qty_available: 10,
+      avg_unit_cost: 1500,
+      total_cost: 18000,
+    },
+    {
+      id: 'sb2',
+      product_id: 'p2',
+      warehouse_id: 'w1',
+      qty_on_hand: 8,
+      qty_reserved: 1,
+      qty_available: 7,
+      avg_unit_cost: 2500,
+      total_cost: 20000,
+    },
+    {
+      id: 'sb3',
+      product_id: 'p3',
+      warehouse_id: 'w3',
+      qty_on_hand: 3,
+      qty_reserved: 0,
+      qty_available: 3,
+      avg_unit_cost: 900,
+      total_cost: 2700,
+    },
+  ],
+
+  stockMoves: [
+    {
+      id: 'sm1',
+      date: '2026-03-24T10:30:00',
+      movement_type: 'adjustment_in',
+      direction: 'in',
+      product_id: 'p3',
+      warehouse_id: 'w3',
+      qty: 3,
+      unit_cost: 900,
+      total_cost: 2700,
+      reference_document_id: null,
+      reference_text: 'Ajuste inicial',
+    },
+    {
+      id: 'sm2',
+      date: '2026-03-25T09:00:00',
+      movement_type: 'transfer_out',
+      direction: 'out',
+      product_id: 'p1',
+      warehouse_id: 'w1',
+      qty: 2,
+      unit_cost: 1500,
+      total_cost: 3000,
+      reference_text: 'Transferência interna',
+    },
+    {
+      id: 'sm3',
+      date: '2026-03-25T09:05:00',
+      movement_type: 'transfer_in',
+      direction: 'in',
+      product_id: 'p1',
+      warehouse_id: 'w2',
+      qty: 2,
+      unit_cost: 1500,
+      total_cost: 3000,
+      reference_text: 'Recepção da transferência',
+    },
+  ],
+
   documents: [
     {
       id: crypto.randomUUID(),
@@ -83,13 +189,17 @@ export function searchDocuments({ query = '', status = '', sortBy = 'date_desc' 
 
   // ORDENAÇÃO
   switch (sortBy) {
-    case 'date_desc':
-      results.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      break;
+   case 'date_desc':
+  results.sort((a, b) => new Date(b.date) - new Date(a.date));
+  break;
 
-    case 'date_asc':
-      results.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-      break;
+case 'date_asc':
+  results.sort((a, b) => new Date(a.date) - new Date(b.date));
+  break;
+
+default:
+  results.sort((a, b) => new Date(b.date) - new Date(a.date));
+  break;
 
     case 'number_asc':
       results.sort((a, b) => a.number.localeCompare(b.number));
@@ -314,6 +424,4 @@ export function getStockMoves() {
   return state.stockMoves || [];
 }
 
-export function getDocuments() {
-  return state.documents || [];
-}
+
