@@ -2,24 +2,8 @@ import { searchDocuments } from '../../core/state.js';
 import { handleDocumentPosting } from './document-posting.js';
 import { handleDocumentCancel } from './document-cancel.js';
 
-export async function renderDocumentsListPage() {
-  const appRoot = document.querySelector('#app');
-
-  const filters = getCurrentListFilters();
-const documents = searchDocuments({
-  query: filters.query,
-  status: filters.status === 'all' ? null : filters.status,
-});
-  const allDocuments = searchDocuments({});
-
-const documentCounters = {
-  total: allDocuments.length,
-  draft: allDocuments.filter((doc) => doc.status === 'draft').length,
-  posted: allDocuments.filter((doc) => doc.status === 'posted').length,
-  cancelled: allDocuments.filter((doc) => doc.status === 'cancelled').length,
-};
-
-  let currentSort = {
+// 👇 AQUI (fora de qualquer função)
+let currentSort = {
   field: 'date',
   direction: 'desc',
 };
@@ -41,6 +25,25 @@ function sortDocuments(list) {
     return 0;
   });
 }
+export async function renderDocumentsListPage() {
+  const appRoot = document.querySelector('#app');
+
+  const filters = getCurrentListFilters();
+const documents = searchDocuments({
+  query: filters.query,
+  status: filters.status === 'all' ? null : filters.status,
+});
+  const allDocuments = searchDocuments({});
+
+const documentCounters = {
+  total: allDocuments.length,
+  draft: allDocuments.filter((doc) => doc.status === 'draft').length,
+  posted: allDocuments.filter((doc) => doc.status === 'posted').length,
+  cancelled: allDocuments.filter((doc) => doc.status === 'cancelled').length,
+};
+
+ 
+
   
 
   appRoot.innerHTML = `
