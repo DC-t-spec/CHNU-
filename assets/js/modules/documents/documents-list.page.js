@@ -19,6 +19,30 @@ const documentCounters = {
   cancelled: allDocuments.filter((doc) => doc.status === 'cancelled').length,
 };
 
+  let currentSort = {
+  field: 'date',
+  direction: 'desc',
+};
+
+function sortDocuments(list) {
+  const { field, direction } = currentSort;
+
+  return [...list].sort((a, b) => {
+    let valA = a[field];
+    let valB = b[field];
+
+    if (field === 'date') {
+      valA = new Date(valA);
+      valB = new Date(valB);
+    }
+
+    if (valA < valB) return direction === 'asc' ? -1 : 1;
+    if (valA > valB) return direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+}
+  
+
   appRoot.innerHTML = `
     <section class="page-shell documents-page">
       <div class="page-header">
@@ -94,7 +118,7 @@ const documentCounters = {
                   <thead>
                     <tr>
                       <th>Número</th>
-                      <th>Data</th>
+                      <th data-sort="date" class="sortable">Data</th>
                       <th>Tipo</th>
                       <th>Origem</th>
                       <th>Destino</th>
@@ -103,7 +127,7 @@ const documentCounters = {
                     </tr>
                   </thead>
                   <tbody>
-                    ${documents.map((doc) => `
+                  ${sortDocuments(documents).map((doc) => `
                       <tr>
                         <td>${doc.number}</td>
                         <td>${formatDocumentDate(doc.date)}</td>
@@ -188,6 +212,23 @@ function bindDocumentsListEvents() {
   if (appRoot) {
     appRoot.addEventListener('click', handleListActionClick);
   }
+const headers = document.querySelectorAll('[data-sort]');
+headers.forEach((header) => {
+  header.addEventListener('click', () => {
+    const field = header.dataset.sort;
+
+    if (currentSort.field === field) {
+      currentSort.direction =
+        currentSort.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+      currentSort.field = field;
+      currentSort.direction = 'asc';
+    }
+
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+  });
+});
+  
 }
 
 async function handleListActionClick(event) {
