@@ -758,3 +758,15 @@
   margin-left: 6px;
   color: #94a3b8;
 }
+
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.pagination-info {
+  font-size: 14px;
+  color: #64748b;
+}
