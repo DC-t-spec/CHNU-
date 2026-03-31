@@ -189,17 +189,13 @@ export function searchDocuments({ query = '', status = '', sortBy = 'date_desc' 
 
   // ORDENAÇÃO
   switch (sortBy) {
-   case 'date_desc':
-  results.sort((a, b) => new Date(b.date) - new Date(a.date));
-  break;
+    case 'date_desc':
+      results.sort((a, b) => new Date(b.date) - new Date(a.date));
+      break;
 
-case 'date_asc':
-  results.sort((a, b) => new Date(a.date) - new Date(b.date));
-  break;
-
-default:
-  results.sort((a, b) => new Date(b.date) - new Date(a.date));
-  break;
+    case 'date_asc':
+      results.sort((a, b) => new Date(a.date) - new Date(b.date));
+      break;
 
     case 'number_asc':
       results.sort((a, b) => a.number.localeCompare(b.number));
@@ -210,10 +206,9 @@ default:
       break;
 
     default:
-      results.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      results.sort((a, b) => new Date(b.date) - new Date(a.date));
       break;
   }
-
   return results;
 }
 
