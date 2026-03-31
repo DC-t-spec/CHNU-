@@ -8,6 +8,16 @@ let currentSort = {
   direction: 'desc',
 };
 
+
+let currentPage = 1;
+const pageSize = 5;
+
+function paginateDocuments(list) {
+  const start = (currentPage - 1) * pageSize;
+  const end = start + pageSize;
+  return list.slice(start, end);
+}
+
 function sortDocuments(list) {
   const { field, direction } = currentSort;
 
@@ -44,7 +54,7 @@ const documentCounters = {
 
  
 
-  
+  const totalPages = Math.ceil(documents.length / pageSize);
 
   appRoot.innerHTML = `
     <section class="page-shell documents-page">
@@ -130,7 +140,7 @@ const documentCounters = {
                     </tr>
                   </thead>
                   <tbody>
-                  ${sortDocuments(documents).map((doc) => `
+${paginateDocuments(sortDocuments(documents)).map((doc) => `
                       <tr>
                         <td>${doc.number}</td>
                         <td>${formatDocumentDate(doc.date)}</td>
@@ -182,6 +192,29 @@ const documentCounters = {
                     `).join('')}
                   </tbody>
                 </table>
+                </div>
+
+<div class="pagination">
+  <button 
+    class="btn btn-secondary"
+    data-page="prev"
+    ${currentPage === 1 ? 'disabled' : ''}
+  >
+    Anterior
+  </button>
+
+  <span class="pagination-info">
+    Página ${currentPage} de ${totalPages || 1}
+  </span>
+
+  <button 
+    class="btn btn-secondary"
+    data-page="next"
+    ${currentPage >= totalPages ? 'disabled' : ''}
+  >
+    Próxima
+  </button>
+</div>
               </div>
             `
             : `
@@ -226,6 +259,24 @@ headers.forEach((header) => {
     } else {
       currentSort.field = field;
       currentSort.direction = 'asc';
+    }
+
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+  });
+});
+
+const paginationButtons = document.querySelectorAll('[data-page]');
+
+paginationButtons.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const action = btn.dataset.page;
+
+    if (action === 'prev' && currentPage > 1) {
+      currentPage--;
+    }
+
+    if (action === 'next') {
+      currentPage++;
     }
 
     window.dispatchEvent(new HashChangeEvent('hashchange'));
