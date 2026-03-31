@@ -70,10 +70,25 @@ function updateSidebarActiveState(route) {
 
     if (target === '#documents/new' && route === '/documents/new') {
       link.classList.add('active');
+      return;
+    }
+
+    if (target === '#inventory' && (route === '/inventory' || route === '/inventory-balances')) {
+      link.classList.add('active');
+      return;
+    }
+
+    if (target === '#inventory-balances' && route === '/inventory-balances') {
+      link.classList.add('active');
+      return;
+    }
+
+    if (target === '#inventory-ledger' && route === '/inventory-ledger') {
+      link.classList.add('active');
+      return;
     }
   });
 }
-
 export async function runCurrentRoute() {
   const resolved = resolveRoute();
   const appRoot = document.querySelector('#app');
