@@ -246,6 +246,8 @@ export function cancelDocument(documentId, reason = '') {
   return document;
 }
 
+
+
 function getDraftDocumentOrThrow(documentId) {
   const document = getDocumentById(documentId);
 
@@ -294,4 +296,24 @@ function recalculateDocumentTotals(document) {
 function generateDocumentNumber() {
   const nextNumber = state.documents.length + 1;
   return `DOC-${String(nextNumber).padStart(4, '0')}`;
+}
+
+export function getProducts() {
+  return state.products || [];
+}
+
+export function getWarehouses() {
+  return state.warehouses || [];
+}
+
+export function getStockBalances() {
+  return state.stockBalances || [];
+}
+
+export function getStockMoves() {
+  return state.stockMoves || [];
+}
+
+export function getDocuments() {
+  return state.documents || [];
 }
