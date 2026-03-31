@@ -32,6 +32,28 @@ const documentCounters = {
         </div>
       </div>
 
+<div class="documents-stats-grid">
+  <div class="documents-stat-card">
+    <span class="documents-stat-card__label">Total</span>
+    <strong class="documents-stat-card__value">${documentCounters.total}</strong>
+  </div>
+
+  <div class="documents-stat-card">
+    <span class="documents-stat-card__label">Draft</span>
+    <strong class="documents-stat-card__value">${documentCounters.draft}</strong>
+  </div>
+
+  <div class="documents-stat-card">
+    <span class="documents-stat-card__label">Posted</span>
+    <strong class="documents-stat-card__value">${documentCounters.posted}</strong>
+  </div>
+
+  <div class="documents-stat-card">
+    <span class="documents-stat-card__label">Cancelled</span>
+    <strong class="documents-stat-card__value">${documentCounters.cancelled}</strong>
+  </div>
+</div>
+
       <div class="card toolbar-card">
         <form id="documents-toolbar-form" class="toolbar toolbar--filters">
           <div class="toolbar__group toolbar__group--search">
