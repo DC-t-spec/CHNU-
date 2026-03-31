@@ -10,6 +10,14 @@ const documents = searchDocuments({
   query: filters.query,
   status: filters.status === 'all' ? null : filters.status,
 });
+  const allDocuments = searchDocuments({});
+
+const documentCounters = {
+  total: allDocuments.length,
+  draft: allDocuments.filter((doc) => doc.status === 'draft').length,
+  posted: allDocuments.filter((doc) => doc.status === 'posted').length,
+  cancelled: allDocuments.filter((doc) => doc.status === 'cancelled').length,
+};
 
   appRoot.innerHTML = `
     <section class="page-shell documents-page">
