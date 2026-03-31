@@ -1,3 +1,7 @@
+import { renderInventoryBalancesPage } from '../modules/inventory/inventory-balances.page.js';
+import { renderInventoryLedgerPage } from '../modules/inventory/inventory-ledger.page.js';
+
+
 const routes = new Map();
 
 export function registerRoute(path, handler) {
