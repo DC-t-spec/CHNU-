@@ -148,8 +148,8 @@ ${paginateDocuments(sortDocuments(documents)).map((doc) => `
                         <td>${doc.origin}</td>
                         <td>${doc.destination}</td>
                         <td>
-                          <span class="status-chip status-${doc.status}">
-                            ${doc.status}
+                          <span class="status-chip status-${formatStatusLabel(doc.status)}">
+                           ${formatStatusLabel(doc.status)}
                           </span>
                         </td>
                         <td>
@@ -231,6 +231,17 @@ ${paginateDocuments(sortDocuments(documents)).map((doc) => `
 
   bindDocumentsListEvents();
 }
+
+function formatStatusLabel(status) {
+  const map = {
+    draft: 'Rascunho',
+    posted: 'Postado',
+    cancelled: 'Cancelado',
+  };
+
+  return map[status] || status;
+}
+
 
 function bindDocumentsListEvents() {
   const toolbarForm = document.querySelector('#documents-toolbar-form');
