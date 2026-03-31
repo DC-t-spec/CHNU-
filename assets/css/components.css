@@ -746,3 +746,15 @@
 .ui-toast-info {
   background: #2563eb;
 }
+
+.sortable {
+  cursor: pointer;
+  position: relative;
+}
+
+.sortable::after {
+  content: '⇅';
+  font-size: 10px;
+  margin-left: 6px;
+  color: #94a3b8;
+}
