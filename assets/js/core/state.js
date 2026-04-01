@@ -165,6 +165,14 @@ const state = {
   ],
 };
 
+function findProductById(productId) {
+  return (
+    (state.products || []).find(
+      (product) => product.id === productId
+    ) || null
+  );
+}
+
 // ==============================
 // HELPERS (NÃO EXPORTADOS)
 // ==============================
@@ -195,6 +203,17 @@ function findProduct(value) {
       );
     }) || null
   );
+}
+
+function resolveLineProduct(line) {
+  if (!line) return null;
+
+  if (line.product_id) {
+    const productById = findProductById(line.product_id);
+    if (productById) return productById;
+  }
+
+  return findProduct(line.item);
 }
 
 function ensureStockStructures() {
@@ -278,7 +297,7 @@ function validateDocumentLines(document) {
       throw new Error(`A linha ${rowNumber} tem custo/preço unitário inválido.`);
     }
 
-  const product = findProduct(line.item);
+  const product = resolveLineProduct(line);
     if (!product) {
       throw new Error(`Produto não encontrado na linha ${rowNumber}: ${line.item}`);
     }
@@ -325,7 +344,7 @@ function validateDocumentStock(document) {
 
   document.lines.forEach((line, index) => {
     const rowNumber = index + 1;
-  const product = findProduct(line.item);
+  const product = resolveLineProduct(line);
 
     if (!product) {
       throw new Error(`Produto não encontrado na linha ${rowNumber}: ${line.item}`);
@@ -434,7 +453,7 @@ function createStockMovesFromDocument(document, { isReversal = false } = {}) {
     : document.postedAt || new Date().toISOString();
 
   document.lines.forEach((line) => {
-const product = findProduct(line.item);
+const product = resolveLineProduct(line);
 
     if (!product) {
       throw new Error(`Produto não encontrado para a linha: ${line.item}`);
@@ -559,13 +578,23 @@ function getDraftDocumentOrThrow(documentId) {
   return document;
 }
 
-function createDocumentLine({ item, quantity, unitPrice }) {
+function createDocumentLine({ product_id = '', item, quantity, unitPrice }) {
   const safeQuantity = Number(quantity) || 0;
   const safeUnitPrice = Number(unitPrice) || 0;
 
+  let resolvedItem = item || '';
+
+  if (product_id) {
+    const product = findProductById(product_id);
+    if (product) {
+      resolvedItem = product.name;
+    }
+  }
+
   return {
     id: crypto.randomUUID(),
-    item: item || '',
+    product_id,
+    item: resolvedItem,
     quantity: safeQuantity,
     unitPrice: safeUnitPrice,
     total: calculateLineTotal(safeQuantity, safeUnitPrice),
@@ -691,11 +720,12 @@ export function updateDocument(id, data) {
 export function addDocumentLine(documentId, lineData) {
   const document = getDraftDocumentOrThrow(documentId);
 
-  const newLine = createDocumentLine({
-    item: lineData.item,
-    quantity: Number(lineData.quantity),
-    unitPrice: Number(lineData.unitPrice),
-  });
+const newLine = createDocumentLine({
+  product_id: lineData.product_id || '',
+  item: lineData.item,
+  quantity: Number(lineData.quantity),
+  unitPrice: Number(lineData.unitPrice),
+});
 
   document.lines.push(newLine);
   recalculateDocumentTotals(document);
@@ -712,10 +742,18 @@ export function updateDocumentLine(documentId, lineId, lineData) {
     throw new Error('Linha não encontrada.');
   }
 
-  line.item = lineData.item;
-  line.quantity = Number(lineData.quantity);
-  line.unitPrice = Number(lineData.unitPrice);
-  line.total = calculateLineTotal(line.quantity, line.unitPrice);
+line.product_id = lineData.product_id || '';
+
+if (line.product_id) {
+  const product = findProductById(line.product_id);
+  line.item = product?.name || lineData.item || '';
+} else {
+  line.item = lineData.item || '';
+}
+
+line.quantity = Number(lineData.quantity);
+line.unitPrice = Number(lineData.unitPrice);
+line.total = calculateLineTotal(line.quantity, line.unitPrice);
 
   recalculateDocumentTotals(document);
 
