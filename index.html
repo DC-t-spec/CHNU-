@@ -6,14 +6,12 @@
 
   <title>CHNU</title>
 
-  <!-- CSS BASE -->
   <link rel="stylesheet" href="./assets/css/tokens.css" />
   <link rel="stylesheet" href="./assets/css/base.css" />
   <link rel="stylesheet" href="./assets/css/layout.css" />
   <link rel="stylesheet" href="./assets/css/components.css" />
   <link rel="stylesheet" href="./assets/css/modules/documents.css" />
   <link rel="stylesheet" href="./assets/css/modules/inventory.css" />
- 
 </head>
 
 <body>
@@ -23,14 +21,15 @@
         <h1>CHNU</h1>
       </div>
 
-   <aside class="sidebar">
-  <a href="#dashboard" class="sidebar__link">Dashboard</a>
-  <a href="#documents" class="sidebar__link">Documentos</a>
-  <a href="#documents/new" class="sidebar__link">Novo Documento</a>
-  <a href="#inventory" class="sidebar__link">Inventory</a>
-  <a href="#inventory-balances" class="sidebar__link">Inventory Balances</a>
-  <a href="#inventory-ledger" class="sidebar__link">Inventory Ledger</a>
-</aside>
+      <nav class="sidebar__nav">
+        <a href="#dashboard" class="sidebar__link">Dashboard</a>
+        <a href="#documents" class="sidebar__link">Documentos</a>
+        <a href="#documents/new" class="sidebar__link">Novo Documento</a>
+        <a href="#inventory" class="sidebar__link">Inventory</a>
+        <a href="#inventory-balances" class="sidebar__link">Inventory Balances</a>
+        <a href="#inventory-ledger" class="sidebar__link">Inventory Ledger</a>
+      </nav>
+    </aside>
 
     <div class="app-main">
       <header class="topbar">
@@ -45,7 +44,6 @@
     </div>
   </div>
 
-  <!-- APP ENTRY -->
   <script type="module" src="./assets/js/app.js"></script>
 </body>
 </html>
