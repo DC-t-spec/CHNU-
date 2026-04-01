@@ -1,3 +1,5 @@
+import { getProducts } from '../../core/state.js';
+
 import {
   addDocumentLine,
   getDocumentById,
@@ -44,6 +46,22 @@ export function bindDocumentLinesEvents(documentId) {
     });
   }
 }
+function renderProductOptions() {
+  const products = getProducts() || [];
+
+  return `
+    <option value="">Selecionar produto</option>
+    ${products
+      .map(
+        (product) => `
+        <option value="${product.name}">
+          ${product.name} (${product.sku || 'Sem SKU'})
+        </option>
+      `
+      )
+      .join('')}
+  `;
+}
 
 function renderLineForm(documentId) {
   return `
@@ -51,7 +69,9 @@ function renderLineForm(documentId) {
       <div class="line-form__grid">
         <div class="form-field">
           <label for="line-item">Item</label>
-          <input id="line-item" name="item" type="text" placeholder="Nome do item" required />
+         <select id="line-item" name="item" required>
+  ${renderProductOptions()}
+</select>
         </div>
 
         <div class="form-field">
@@ -160,14 +180,29 @@ function handleAddLine(event, documentId) {
 
   const payload = {
     item: formData.get('item')?.trim(),
-    quantity: formData.get('quantity'),
-    unitPrice: formData.get('unitPrice'),
+    quantity: Number(formData.get('quantity')),
+    unitPrice: Number(formData.get('unitPrice')),
   };
+
+  // 🔒 validação profissional
+  if (!payload.item) {
+    alert('Seleciona um produto válido.');
+    return;
+  }
+
+  if (!payload.quantity || payload.quantity <= 0) {
+    alert('Quantidade inválida.');
+    return;
+  }
+
+  if (payload.unitPrice < 0) {
+    alert('Preço inválido.');
+    return;
+  }
 
   addDocumentLine(documentId, payload);
   window.location.hash = `#documents/edit?id=${documentId}`;
 }
-
 function handleLineTableClick(event, documentId) {
   const trigger = event.target.closest('[data-action]');
   if (!trigger) return;
@@ -194,8 +229,13 @@ function openLineEditPrompt(documentId, lineId) {
   const line = documentData.lines.find((entry) => entry.id === lineId);
   if (!line) return;
 
-  const nextItem = window.prompt('Editar item:', line.item);
-  if (nextItem === null) return;
+ const products = getProducts();
+const exists = products.some(p => p.name === nextItem.trim());
+
+if (!exists) {
+  alert('Produto inválido.');
+  return;
+}
 
   const nextQuantity = window.prompt('Editar quantidade:', String(line.quantity));
   if (nextQuantity === null) return;
