@@ -330,6 +330,8 @@ export function postDocument(documentId) {
   document.status = 'posted';
   document.postedAt = new Date().toISOString();
 
+  createStockMovesFromDocument(document);
+
   return document;
 }
 
@@ -347,6 +349,8 @@ export function cancelDocument(documentId, reason = '') {
   document.status = 'cancelled';
   document.cancelledAt = new Date().toISOString();
   document.cancelReason = reason?.trim() || 'Sem motivo informado.';
+
+  createStockMovesFromDocument(document, { isReversal: true });
 
   return document;
 }
@@ -417,6 +421,241 @@ export function getStockBalances() {
 
 export function getStockMoves() {
   return state.stockMoves || [];
+}
+
+
+function normalizeText(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function findWarehouseByName(name) {
+  return (state.warehouses || []).find(
+    (warehouse) => normalizeText(warehouse.name) === normalizeText(name)
+  ) || null;
+}
+
+function findProductByName(name) {
+  return (state.products || []).find(
+    (product) => normalizeText(product.name) === normalizeText(name)
+  ) || null;
+}
+
+function ensureStockStructures() {
+  if (!Array.isArray(state.stockMoves)) {
+    state.stockMoves = [];
+  }
+
+  if (!Array.isArray(state.stockBalances)) {
+    state.stockBalances = [];
+  }
+}
+
+function getOrCreateStockBalance(productId, warehouseId) {
+  ensureStockStructures();
+
+  let balance = state.stockBalances.find(
+    (item) => item.product_id === productId && item.warehouse_id === warehouseId
+  );
+
+  if (!balance) {
+    balance = {
+      id: crypto.randomUUID(),
+      product_id: productId,
+      warehouse_id: warehouseId,
+      qty_on_hand: 0,
+      qty_reserved: 0,
+      qty_available: 0,
+      avg_unit_cost: 0,
+      total_cost: 0,
+    };
+
+    state.stockBalances.push(balance);
+  }
+
+  return balance;
+}
+
+function recalculateBalance(balance) {
+  balance.qty_available = Number(balance.qty_on_hand || 0) - Number(balance.qty_reserved || 0);
+  balance.total_cost = Number(balance.qty_on_hand || 0) * Number(balance.avg_unit_cost || 0);
+  return balance;
+}
+
+function createStockMove({
+  documentId,
+  date,
+  movementType,
+  direction,
+  productId,
+  warehouseId,
+  qty,
+  unitCost,
+  referenceText = '',
+  isReversal = false,
+}) {
+  const safeQty = Number(qty) || 0;
+  const safeUnitCost = Number(unitCost) || 0;
+
+  const move = {
+    id: crypto.randomUUID(),
+    date: date || new Date().toISOString(),
+    movement_type: movementType,
+    direction,
+    product_id: productId,
+    warehouse_id: warehouseId,
+    qty: safeQty,
+    unit_cost: safeUnitCost,
+    total_cost: safeQty * safeUnitCost,
+    reference_document_id: documentId || null,
+    reference_text: referenceText || '',
+    is_reversal: Boolean(isReversal),
+  };
+
+  state.stockMoves.push(move);
+
+  const balance = getOrCreateStockBalance(productId, warehouseId);
+
+  if (direction === 'in') {
+    const currentQty = Number(balance.qty_on_hand || 0);
+    const currentAvg = Number(balance.avg_unit_cost || 0);
+    const nextQty = currentQty + safeQty;
+
+    if (nextQty > 0) {
+      balance.avg_unit_cost =
+        ((currentQty * currentAvg) + (safeQty * safeUnitCost)) / nextQty;
+    } else {
+      balance.avg_unit_cost = safeUnitCost;
+    }
+
+    balance.qty_on_hand = nextQty;
+  }
+
+  if (direction === 'out') {
+    balance.qty_on_hand = Number(balance.qty_on_hand || 0) - safeQty;
+  }
+
+  recalculateBalance(balance);
+
+  return move;
+}
+
+function createStockMovesFromDocument(document, { isReversal = false } = {}) {
+  if (!document) {
+    throw new Error('Documento inválido para geração de movimentos.');
+  }
+
+  const originWarehouse = findWarehouseByName(document.origin);
+  const destinationWarehouse = findWarehouseByName(document.destination);
+
+  const movementDate = isReversal
+    ? new Date().toISOString()
+    : document.postedAt || new Date().toISOString();
+
+  document.lines.forEach((line) => {
+    const product = findProductByName(line.item);
+
+    if (!product) {
+      throw new Error(`Produto não encontrado para a linha: ${line.item}`);
+    }
+
+    const qty = Number(line.quantity) || 0;
+    const unitCost = Number(line.unitPrice) || 0;
+
+    if (document.type === 'Transferência') {
+      if (!originWarehouse) {
+        throw new Error(`Armazém de origem não encontrado: ${document.origin}`);
+      }
+
+      if (!destinationWarehouse) {
+        throw new Error(`Armazém de destino não encontrado: ${document.destination}`);
+      }
+
+      if (!isReversal) {
+        createStockMove({
+          documentId: document.id,
+          date: movementDate,
+          movementType: 'transfer_out',
+          direction: 'out',
+          productId: product.id,
+          warehouseId: originWarehouse.id,
+          qty,
+          unitCost,
+          referenceText: `Transferência ${document.number}`,
+        });
+
+        createStockMove({
+          documentId: document.id,
+          date: movementDate,
+          movementType: 'transfer_in',
+          direction: 'in',
+          productId: product.id,
+          warehouseId: destinationWarehouse.id,
+          qty,
+          unitCost,
+          referenceText: `Transferência ${document.number}`,
+        });
+      } else {
+        createStockMove({
+          documentId: document.id,
+          date: movementDate,
+          movementType: 'transfer_reversal_in',
+          direction: 'in',
+          productId: product.id,
+          warehouseId: originWarehouse.id,
+          qty,
+          unitCost,
+          referenceText: `Reversão ${document.number}`,
+          isReversal: true,
+        });
+
+        createStockMove({
+          documentId: document.id,
+          date: movementDate,
+          movementType: 'transfer_reversal_out',
+          direction: 'out',
+          productId: product.id,
+          warehouseId: destinationWarehouse.id,
+          qty,
+          unitCost,
+          referenceText: `Reversão ${document.number}`,
+          isReversal: true,
+        });
+      }
+    }
+
+    if (document.type === 'Ajuste') {
+      if (!destinationWarehouse) {
+        throw new Error(`Armazém de destino não encontrado: ${document.destination}`);
+      }
+
+      if (!isReversal) {
+        createStockMove({
+          documentId: document.id,
+          date: movementDate,
+          movementType: 'adjustment_in',
+          direction: 'in',
+          productId: product.id,
+          warehouseId: destinationWarehouse.id,
+          qty,
+          unitCost,
+          referenceText: `Ajuste ${document.number}`,
+        });
+      } else {
+        createStockMove({
+          documentId: document.id,
+          date: movementDate,
+          movementType: 'adjustment_reversal_out',
+          direction: 'out',
+          productId: product.id,
+          warehouseId: destinationWarehouse.id,
+          qty,
+          unitCost,
+          referenceText: `Reversão ${document.number}`,
+          isReversal: true,
+        });
+      }
+    }
+  });
 }
 
 
