@@ -4,7 +4,7 @@ import { renderInventoryLedgerPage } from '../modules/inventory/inventory-ledger
 
 const routes = new Map();
 
-export function registerRoute(path, handler) {
+export function registerRoute(path, handler) { 
   routes.set(path, handler);
 }
 
