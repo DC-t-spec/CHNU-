@@ -23,6 +23,20 @@ function formatCurrency(value) {
   }).format(Number(value || 0));
 }
 
+function getStockStatusBadge(qty) {
+  const safeQty = Number(qty || 0);
+
+  if (safeQty <= 0) {
+    return `<span class="status-pill status-pill--danger">Sem stock</span>`;
+  }
+
+  if (safeQty <= 3) {
+    return `<span class="status-pill status-pill--warning">Stock baixo</span>`;
+  }
+
+  return `<span class="status-pill status-pill--success">Saudável</span>`;
+}
+
 function renderSummaryCards(summary) {
   return `
     <section class="documents-stats-grid">
@@ -136,6 +150,7 @@ function renderBalancesTable(rows) {
               <th>Qty available</th>
               <th>Custo médio</th>
               <th>Custo total</th>
+                  <th>Status</th>
             </tr>
           </thead>
           <tbody>
@@ -151,6 +166,7 @@ function renderBalancesTable(rows) {
                     <td>${formatNumber(row.qty_available)}</td>
                     <td>${formatCurrency(row.avg_unit_cost)}</td>
                     <td>${formatCurrency(row.total_cost)}</td>
+                      <td>${getStockStatusBadge(row.qty_available)}</td>
                   </tr>
                 `
               )
