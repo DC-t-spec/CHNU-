@@ -1,7 +1,16 @@
 import {
-  getInventoryBalances,
   getInventoryBalanceSummary,
+  searchInventoryBalances,
+  paginateInventoryRows,
+  getInventoryFilterOptions,
 } from '../../services/inventory.service.js';
+import {
+  getInventoryPageFilters,
+  updateInventoryPageFilters,
+  resetInventoryPageFilters,
+} from './inventory-filters.js';
+
+const PAGE_SIZE = 5;
 
 function formatNumber(value) {
   return new Intl.NumberFormat('pt-PT').format(Number(value || 0));
@@ -40,12 +49,74 @@ function renderSummaryCards(summary) {
   `;
 }
 
+function renderFilters(filters, options) {
+  return `
+    <div class="card toolbar-card">
+      <form class="toolbar toolbar--filters" id="inventory-balances-filters-form">
+        <div class="toolbar__group toolbar__group--search">
+          <label class="toolbar__label" for="inventory-balances-query">Pesquisar</label>
+          <input
+            id="inventory-balances-query"
+            name="query"
+            class="toolbar__input"
+            type="text"
+            placeholder="Produto, SKU ou armazém"
+            value="${filters.query || ''}"
+          />
+        </div>
+
+        <div class="toolbar__group">
+          <label class="toolbar__label" for="inventory-balances-warehouse">Armazém</label>
+          <select
+            id="inventory-balances-warehouse"
+            name="warehouse"
+            class="toolbar__select"
+          >
+            <option value="">Todos</option>
+            ${options.warehouses
+              .map(
+                (item) => `
+                  <option value="${item}" ${filters.warehouse === item ? 'selected' : ''}>${item}</option>
+                `
+              )
+              .join('')}
+          </select>
+        </div>
+
+        <div class="toolbar__group">
+          <label class="toolbar__label" for="inventory-balances-sort">Ordenar</label>
+          <select
+            id="inventory-balances-sort"
+            name="sortBy"
+            class="toolbar__select"
+          >
+            <option value="product_asc" ${filters.sortBy === 'product_asc' ? 'selected' : ''}>Produto A-Z</option>
+            <option value="product_desc" ${filters.sortBy === 'product_desc' ? 'selected' : ''}>Produto Z-A</option>
+            <option value="warehouse_asc" ${filters.sortBy === 'warehouse_asc' ? 'selected' : ''}>Armazém A-Z</option>
+            <option value="warehouse_desc" ${filters.sortBy === 'warehouse_desc' ? 'selected' : ''}>Armazém Z-A</option>
+            <option value="qty_desc" ${filters.sortBy === 'qty_desc' ? 'selected' : ''}>Maior stock</option>
+            <option value="qty_asc" ${filters.sortBy === 'qty_asc' ? 'selected' : ''}>Menor stock</option>
+            <option value="value_desc" ${filters.sortBy === 'value_desc' ? 'selected' : ''}>Maior valor</option>
+            <option value="value_asc" ${filters.sortBy === 'value_asc' ? 'selected' : ''}>Menor valor</option>
+          </select>
+        </div>
+
+        <div class="toolbar__group toolbar__group--actions">
+          <button type="submit" class="btn btn-primary">Aplicar</button>
+          <button type="button" class="btn btn-secondary" data-action="reset-balances-filters">Limpar</button>
+        </div>
+      </form>
+    </div>
+  `;
+}
+
 function renderBalancesTable(rows) {
   if (!rows.length) {
     return `
       <div class="card">
-        <div class="card-body">
-          <p>Não existem saldos de stock para apresentar.</p>
+        <div class="card-body empty-state">
+          <h2>Sem resultados</h2>
+          <p>Não existem saldos de stock que correspondam aos filtros aplicados.</p>
         </div>
       </div>
     `;
@@ -91,23 +162,109 @@ function renderBalancesTable(rows) {
   `;
 }
 
+function renderPagination(pagination) {
+  return `
+    <div class="pagination">
+      <button
+        class="btn btn-secondary"
+        type="button"
+        data-action="balances-page-prev"
+        ${pagination.page <= 1 ? 'disabled' : ''}
+      >
+        Anterior
+      </button>
+
+      <div class="pagination-info">
+        Página ${pagination.page} de ${pagination.totalPages}
+      </div>
+
+      <button
+        class="btn btn-secondary"
+        type="button"
+        data-action="balances-page-next"
+        ${pagination.page >= pagination.totalPages ? 'disabled' : ''}
+      >
+        Próxima
+      </button>
+    </div>
+  `;
+}
+
+function bindBalancesPageEvents(pagination) {
+  const form = document.querySelector('#inventory-balances-filters-form');
+  const resetButton = document.querySelector('[data-action="reset-balances-filters"]');
+  const prevButton = document.querySelector('[data-action="balances-page-prev"]');
+  const nextButton = document.querySelector('[data-action="balances-page-next"]');
+
+  form?.addEventListener('submit', (event) => {
+    event.preventDefault();
+
+    const formData = new FormData(form);
+
+    updateInventoryPageFilters({
+      query: formData.get('query') || '',
+      warehouse: formData.get('warehouse') || '',
+      sortBy: formData.get('sortBy') || 'product_asc',
+      page: 1,
+    });
+  });
+
+  resetButton?.addEventListener('click', () => {
+    resetInventoryPageFilters(['query', 'warehouse', 'sortBy', 'page']);
+  });
+
+  prevButton?.addEventListener('click', () => {
+    if (pagination.page <= 1) return;
+
+    updateInventoryPageFilters({
+      page: pagination.page - 1,
+    });
+  });
+
+  nextButton?.addEventListener('click', () => {
+    if (pagination.page >= pagination.totalPages) return;
+
+    updateInventoryPageFilters({
+      page: pagination.page + 1,
+    });
+  });
+}
+
 export async function renderInventoryBalancesPage() {
   const appRoot = document.querySelector('#app');
   if (!appRoot) return;
 
-  const balances = getInventoryBalances();
+  const filters = getInventoryPageFilters({
+    sortBy: 'product_asc',
+    page: 1,
+  });
+
   const summary = getInventoryBalanceSummary();
+  const options = getInventoryFilterOptions();
+
+  const rows = searchInventoryBalances({
+    query: filters.query,
+    warehouse: filters.warehouse,
+    sortBy: filters.sortBy,
+  });
+
+  const { items, pagination } = paginateInventoryRows(rows, filters.page, PAGE_SIZE);
 
   appRoot.innerHTML = `
-    <section class="page-header">
-      <div>
-        <h1>Inventory Balances</h1>
-        <p>Visão actual dos saldos de stock por produto e armazém.</p>
-      </div>
+    <section class="page-shell inventory-balances-page">
+      <section class="page-header">
+        <div>
+          <h1>Inventory Balances</h1>
+          <p>Visão actual dos saldos de stock por produto e armazém.</p>
+        </div>
+      </section>
+
+      ${renderSummaryCards(summary)}
+      ${renderFilters(filters, options)}
+      ${renderBalancesTable(items)}
+      ${renderPagination(pagination)}
     </section>
-
-    ${renderSummaryCards(summary)}
-
-    ${renderBalancesTable(balances)}
   `;
+
+  bindBalancesPageEvents(pagination);
 }
