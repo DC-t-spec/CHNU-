@@ -160,6 +160,126 @@ const state = {
   ],
 };
 
+// ==============================
+// HELPERS (NÃO EXPORTADOS)
+// ==============================
+
+
+function getStockBalanceByProductAndWarehouse(productId, warehouseId) {
+  return (
+    state.stockBalances.find(
+      (item) => item.product_id === productId && item.warehouse_id === warehouseId
+    ) || null
+  );
+}
+
+function getAvailableQty(productId, warehouseId) {
+  const balance = getStockBalanceByProductAndWarehouse(productId, warehouseId);
+
+  if (!balance) return 0;
+
+  return Number(balance.qty_available ?? balance.qty_on_hand ?? 0);
+}
+
+function validateDocumentLines(document) {
+  if (!document.lines || !Array.isArray(document.lines) || !document.lines.length) {
+    throw new Error('Não é possível postar um documento sem linhas.');
+  }
+
+  document.lines.forEach((line, index) => {
+    const rowNumber = index + 1;
+
+    if (!line.item || !String(line.item).trim()) {
+      throw new Error(`A linha ${rowNumber} não tem produto definido.`);
+    }
+
+    const qty = Number(line.quantity);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      throw new Error(`A linha ${rowNumber} tem quantidade inválida.`);
+    }
+
+    const unitPrice = Number(line.unitPrice);
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+      throw new Error(`A linha ${rowNumber} tem custo/preço unitário inválido.`);
+    }
+
+    const product = findProductByName(line.item);
+    if (!product) {
+      throw new Error(`Produto não encontrado na linha ${rowNumber}: ${line.item}`);
+    }
+  });
+}
+
+function validateDocumentWarehouses(document) {
+  if (document.type === 'Transferência') {
+    const originWarehouse = findWarehouseByName(document.origin);
+    const destinationWarehouse = findWarehouseByName(document.destination);
+
+    if (!originWarehouse) {
+      throw new Error(`Armazém de origem não encontrado: ${document.origin}`);
+    }
+
+    if (!destinationWarehouse) {
+      throw new Error(`Armazém de destino não encontrado: ${document.destination}`);
+    }
+
+    if (originWarehouse.id === destinationWarehouse.id) {
+      throw new Error('A transferência exige armazéns de origem e destino diferentes.');
+    }
+  }
+
+  if (document.type === 'Ajuste') {
+    const destinationWarehouse = findWarehouseByName(document.destination);
+
+    if (!destinationWarehouse) {
+      throw new Error(`Armazém de destino não encontrado: ${document.destination}`);
+    }
+  }
+}
+
+function validateDocumentWarehouses(document) {
+  if (document.type === 'Transferência') {
+    const originWarehouse = findWarehouseByName(document.origin);
+    const destinationWarehouse = findWarehouseByName(document.destination);
+
+    if (!originWarehouse) {
+      throw new Error(`Armazém de origem não encontrado: ${document.origin}`);
+    }
+
+    if (!destinationWarehouse) {
+      throw new Error(`Armazém de destino não encontrado: ${document.destination}`);
+    }
+
+    if (originWarehouse.id === destinationWarehouse.id) {
+      throw new Error('A transferência exige armazéns de origem e destino diferentes.');
+    }
+  }
+
+  if (document.type === 'Ajuste') {
+    const destinationWarehouse = findWarehouseByName(document.destination);
+
+    if (!destinationWarehouse) {
+      throw new Error(`Armazém de destino não encontrado: ${document.destination}`);
+    }
+  }
+}
+
+function validateDocumentBeforePosting(document) {
+  if (!document) {
+    throw new Error('Documento não encontrado.');
+  }
+
+  if (document.status !== 'draft') {
+    throw new Error('Apenas documentos em draft podem ser postados.');
+  }
+
+  validateDocumentLines(document);
+  validateDocumentWarehouses(document);
+  validateDocumentStock(document);
+}
+
+
+
 export function getState() {
   return state;
 }
@@ -315,17 +435,7 @@ export function getDocumentTotals(documentId) {
 export function postDocument(documentId) {
   const document = getDocumentById(documentId);
 
-  if (!document) {
-    throw new Error('Documento não encontrado.');
-  }
-
-  if (document.status !== 'draft') {
-    throw new Error('Apenas documentos em draft podem ser postados.');
-  }
-
-  if (!document.lines.length) {
-    throw new Error('Não é possível postar um documento sem linhas.');
-  }
+  validateDocumentBeforePosting(document);
 
   document.status = 'posted';
   document.postedAt = new Date().toISOString();
@@ -334,7 +444,6 @@ export function postDocument(documentId) {
 
   return document;
 }
-
 export function cancelDocument(documentId, reason = '') {
   const document = getDocumentById(documentId);
 
@@ -492,7 +601,8 @@ function createStockMove({
   unitCost,
   referenceText = '',
   isReversal = false,
-}) {
+}) 
+{
   const safeQty = Number(qty) || 0;
   const safeUnitCost = Number(unitCost) || 0;
 
@@ -515,16 +625,12 @@ function createStockMove({
 
   const balance = getOrCreateStockBalance(productId, warehouseId);
 
-  if (direction === 'in') {
+   if (direction === 'out') {
     const currentQty = Number(balance.qty_on_hand || 0);
-    const currentAvg = Number(balance.avg_unit_cost || 0);
-    const nextQty = currentQty + safeQty;
+    const nextQty = currentQty - safeQty;
 
-    if (nextQty > 0) {
-      balance.avg_unit_cost =
-        ((currentQty * currentAvg) + (safeQty * safeUnitCost)) / nextQty;
-    } else {
-      balance.avg_unit_cost = safeUnitCost;
+    if (nextQty < 0) {
+      throw new Error('Operação bloqueada: o movimento deixaria o stock negativo.');
     }
 
     balance.qty_on_hand = nextQty;
