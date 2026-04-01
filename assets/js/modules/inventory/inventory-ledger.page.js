@@ -23,6 +23,20 @@ function formatCurrency(value) {
   }).format(Number(value || 0));
 }
 
+function getStockStatusBadge(qty) {
+  const safeQty = Number(qty || 0);
+
+  if (safeQty <= 0) {
+    return `<span class="status-pill status-pill--danger">Sem stock</span>`;
+  }
+
+  if (safeQty <= 3) {
+    return `<span class="status-pill status-pill--warning">Stock baixo</span>`;
+  }
+
+  return `<span class="status-pill status-pill--success">Saudável</span>`;
+}
+
 function formatDate(value) {
   if (!value) return '—';
 
@@ -196,6 +210,7 @@ function renderLedgerTable(rows) {
               <th>Qty</th>
               <th>Custo unitário</th>
               <th>Custo total</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody>
@@ -213,6 +228,7 @@ function renderLedgerTable(rows) {
                     <td>${formatNumber(row.qty)}</td>
                     <td>${formatCurrency(row.unit_cost)}</td>
                     <td>${formatCurrency(row.total_cost)}</td>
+                    <td>${getStockStatusBadge(row.qty_available)}</td>
                   </tr>
                 `
               )
