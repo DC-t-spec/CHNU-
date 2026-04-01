@@ -13,9 +13,9 @@ function renderProductOptions(selectedValue = '') {
     <option value="">Selecionar produto</option>
     ${products
       .map((product) => {
-        const selected = product.name === selectedValue ? 'selected' : '';
+        const selected = product.id === selectedValue ? 'selected' : '';
         return `
-          <option value="${product.name}" ${selected}>
+          <option value="${product.id}" ${selected}>
             ${product.name} (${product.sku || 'Sem SKU'})
           </option>
         `;
@@ -70,7 +70,7 @@ function renderLineForm(documentId) {
       <div class="line-form__grid">
         <div class="form-field">
           <label for="line-item">Item</label>
-          <select id="line-item" name="item" required>
+          <select id="line-product-id" name="product_id" required>
             ${renderProductOptions()}
           </select>
         </div>
@@ -178,14 +178,19 @@ function handleAddLine(event, documentId) {
 
   const form = event.currentTarget;
   const formData = new FormData(form);
+  const products = getProducts() || [];
+
+  const productId = formData.get('product_id')?.trim();
+  const product = products.find((entry) => entry.id === productId);
 
   const payload = {
-    item: formData.get('item')?.trim(),
+    product_id: productId,
+    item: product?.name || '',
     quantity: Number(formData.get('quantity')),
     unitPrice: Number(formData.get('unitPrice')),
   };
 
-  if (!payload.item) {
+  if (!payload.product_id || !product) {
     alert('Seleciona um produto válido.');
     return;
   }
