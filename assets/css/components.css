@@ -772,26 +772,83 @@
 }
 
 
-.status-chip {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 12px;
+
+
+
+
+/* Compatibilidade para páginas que usam .table */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+  background: transparent;
+}
+
+.table thead th {
+  text-align: left;
+  padding: 14px 16px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.table tbody td {
+  padding: 16px;
+  font-size: 0.93rem;
+  color: var(--color-text-primary);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.documents-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+
+.documents-stat-card {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: var(--shadow-card);
+}
+
+.documents-stat-card__label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 0.84rem;
   font-weight: 600;
-  text-transform: capitalize;
+  color: var(--color-text-secondary);
 }
 
-.status-draft {
-  background: #f1f5f9;
-  color: #475569;
+.documents-stat-card__value {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--color-text-primary);
 }
 
-.status-posted {
-  background: #dcfce7;
-  color: #166534;
+@media (max-width: 1024px) {
+  .documents-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
-.status-cancelled {
-  background: #fee2e2;
-  color: #991b1b;
+@media (max-width: 640px) {
+  .documents-stats-grid {
+    grid-template-columns: 1fr;
+  }
 }
