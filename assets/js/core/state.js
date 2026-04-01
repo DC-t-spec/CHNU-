@@ -785,16 +785,6 @@ export function getStockMoves() {
 
 
 
-function ensureStockStructures() {
-  if (!Array.isArray(state.stockMoves)) {
-    state.stockMoves = [];
-  }
-
-  if (!Array.isArray(state.stockBalances)) {
-    state.stockBalances = [];
-  }
-}
-
 function getOrCreateStockBalance(productId, warehouseId) {
   ensureStockStructures();
 
