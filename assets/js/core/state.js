@@ -782,9 +782,6 @@ export function getStockMoves() {
 }
 
 
-function normalizeText(value) {
-  return String(value || '').trim().toLowerCase();
-}
 
 function findWarehouseByName(name) {
   return (state.warehouses || []).find(
