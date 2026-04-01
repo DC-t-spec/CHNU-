@@ -168,3 +168,190 @@ export function getInventoryLedgerSummary() {
     total_value: totalValue,
   };
 }
+
+function normalizeText(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function matchesText(row, query) {
+  if (!query) return true;
+
+  const q = normalizeText(query);
+
+  return [
+    row.product_name,
+    row.product_sku,
+    row.warehouse_name,
+    row.reference_label,
+    row.movement_type,
+    row.move_type,
+    row.direction,
+  ]
+    .filter(Boolean)
+    .some((value) => normalizeText(value).includes(q));
+}
+
+export function searchInventoryBalances({
+  query = '',
+  warehouse = '',
+  sortBy = 'product_asc',
+} = {}) {
+  let rows = [...getInventoryBalances()];
+
+  if (query) {
+    rows = rows.filter((row) => matchesText(row, query));
+  }
+
+  if (warehouse) {
+    rows = rows.filter(
+      (row) => normalizeText(row.warehouse_name) === normalizeText(warehouse)
+    );
+  }
+
+  switch (sortBy) {
+    case 'product_desc':
+      rows.sort((a, b) => b.product_name.localeCompare(a.product_name));
+      break;
+
+    case 'warehouse_asc':
+      rows.sort((a, b) => a.warehouse_name.localeCompare(b.warehouse_name));
+      break;
+
+    case 'warehouse_desc':
+      rows.sort((a, b) => b.warehouse_name.localeCompare(a.warehouse_name));
+      break;
+
+    case 'qty_desc':
+      rows.sort((a, b) => Number(b.qty_on_hand) - Number(a.qty_on_hand));
+      break;
+
+    case 'qty_asc':
+      rows.sort((a, b) => Number(a.qty_on_hand) - Number(b.qty_on_hand));
+      break;
+
+    case 'value_desc':
+      rows.sort((a, b) => Number(b.total_cost) - Number(a.total_cost));
+      break;
+
+    case 'value_asc':
+      rows.sort((a, b) => Number(a.total_cost) - Number(b.total_cost));
+      break;
+
+    case 'product_asc':
+    default:
+      rows.sort((a, b) => a.product_name.localeCompare(b.product_name));
+      break;
+  }
+
+  return rows;
+}
+
+export function searchInventoryLedger({
+  query = '',
+  warehouse = '',
+  movementType = '',
+  direction = '',
+  sortBy = 'date_desc',
+} = {}) {
+  let rows = [...getInventoryLedger()];
+
+  if (query) {
+    rows = rows.filter((row) => matchesText(row, query));
+  }
+
+  if (warehouse) {
+    rows = rows.filter(
+      (row) => normalizeText(row.warehouse_name) === normalizeText(warehouse)
+    );
+  }
+
+  if (movementType) {
+    rows = rows.filter(
+      (row) =>
+        normalizeText(row.movement_type || row.move_type) ===
+        normalizeText(movementType)
+    );
+  }
+
+  if (direction) {
+    rows = rows.filter(
+      (row) => normalizeText(row.direction) === normalizeText(direction)
+    );
+  }
+
+  switch (sortBy) {
+    case 'date_asc':
+      rows.sort((a, b) => new Date(a.date) - new Date(b.date));
+      break;
+
+    case 'product_asc':
+      rows.sort((a, b) => a.product_name.localeCompare(b.product_name));
+      break;
+
+    case 'product_desc':
+      rows.sort((a, b) => b.product_name.localeCompare(a.product_name));
+      break;
+
+    case 'qty_desc':
+      rows.sort((a, b) => Number(b.qty) - Number(a.qty));
+      break;
+
+    case 'qty_asc':
+      rows.sort((a, b) => Number(a.qty) - Number(b.qty));
+      break;
+
+    case 'value_desc':
+      rows.sort((a, b) => Number(b.total_cost) - Number(a.total_cost));
+      break;
+
+    case 'value_asc':
+      rows.sort((a, b) => Number(a.total_cost) - Number(b.total_cost));
+      break;
+
+    case 'date_desc':
+    default:
+      rows.sort((a, b) => new Date(b.date) - new Date(a.date));
+      break;
+  }
+
+  return rows;
+}
+
+export function paginateInventoryRows(rows, page = 1, pageSize = 10) {
+  const safePage = Math.max(1, Number(page) || 1);
+  const safePageSize = Math.max(1, Number(pageSize) || 10);
+  const totalItems = rows.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / safePageSize));
+  const normalizedPage = Math.min(safePage, totalPages);
+
+  const start = (normalizedPage - 1) * safePageSize;
+  const end = start + safePageSize;
+
+  return {
+    items: rows.slice(start, end),
+    pagination: {
+      page: normalizedPage,
+      pageSize: safePageSize,
+      totalItems,
+      totalPages,
+    },
+  };
+}
+
+export function getInventoryFilterOptions() {
+  const balances = getInventoryBalances();
+  const ledger = getInventoryLedger();
+
+  const warehouseSet = new Set(
+    [...balances, ...ledger].map((row) => row.warehouse_name).filter(Boolean)
+  );
+
+  const movementTypeSet = new Set(
+    ledger.map((row) => row.movement_type || row.move_type).filter(Boolean)
+  );
+
+  return {
+    warehouses: [...warehouseSet].sort((a, b) => a.localeCompare(b)),
+    movementTypes: [...movementTypeSet].sort((a, b) => a.localeCompare(b)),
+  };
+}
