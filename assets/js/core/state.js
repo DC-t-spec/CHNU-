@@ -15,6 +15,11 @@ const state = {
       name: 'Produto C',
       sku: 'SKU-C',
     },
+     {
+    id: 'p4',
+    name: 'TV RCD',
+    sku: 'tvrcd',
+  },
   ],
 
   warehouses: [
