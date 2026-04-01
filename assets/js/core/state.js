@@ -164,6 +164,35 @@ const state = {
 // HELPERS (NÃO EXPORTADOS)
 // ==============================
 
+function normalizeText(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function findWarehouseByName(name) {
+  return (
+    (state.warehouses || []).find(
+      (warehouse) => normalizeText(warehouse.name) === normalizeText(name)
+    ) || null
+  );
+}
+
+function findProductByName(name) {
+  return (
+    (state.products || []).find(
+      (product) => normalizeText(product.name) === normalizeText(name)
+    ) || null
+  );
+}
+
+function ensureStockStructures() {
+  if (!Array.isArray(state.stockMoves)) {
+    state.stockMoves = [];
+  }
+
+  if (!Array.isArray(state.stockBalances)) {
+    state.stockBalances = [];
+  }
+}
 
 function getStockBalanceByProductAndWarehouse(productId, warehouseId) {
   return (
@@ -179,6 +208,39 @@ function getAvailableQty(productId, warehouseId) {
   if (!balance) return 0;
 
   return Number(balance.qty_available ?? balance.qty_on_hand ?? 0);
+}
+
+function getOrCreateStockBalance(productId, warehouseId) {
+  ensureStockStructures();
+
+  let balance = getStockBalanceByProductAndWarehouse(productId, warehouseId);
+
+  if (!balance) {
+    balance = {
+      id: crypto.randomUUID(),
+      product_id: productId,
+      warehouse_id: warehouseId,
+      qty_on_hand: 0,
+      qty_reserved: 0,
+      qty_available: 0,
+      avg_unit_cost: 0,
+      total_cost: 0,
+    };
+
+    state.stockBalances.push(balance);
+  }
+
+  return balance;
+}
+
+function recalculateBalance(balance) {
+  balance.qty_available =
+    Number(balance.qty_on_hand || 0) - Number(balance.qty_reserved || 0);
+
+  balance.total_cost =
+    Number(balance.qty_on_hand || 0) * Number(balance.avg_unit_cost || 0);
+
+  return balance;
 }
 
 function validateDocumentLines(document) {
@@ -237,31 +299,34 @@ function validateDocumentWarehouses(document) {
   }
 }
 
-function validateDocumentWarehouses(document) {
-  if (document.type === 'Transferência') {
-    const originWarehouse = findWarehouseByName(document.origin);
-    const destinationWarehouse = findWarehouseByName(document.destination);
-
-    if (!originWarehouse) {
-      throw new Error(`Armazém de origem não encontrado: ${document.origin}`);
-    }
-
-    if (!destinationWarehouse) {
-      throw new Error(`Armazém de destino não encontrado: ${document.destination}`);
-    }
-
-    if (originWarehouse.id === destinationWarehouse.id) {
-      throw new Error('A transferência exige armazéns de origem e destino diferentes.');
-    }
+function validateDocumentStock(document) {
+  if (document.type !== 'Transferência') {
+    return;
   }
 
-  if (document.type === 'Ajuste') {
-    const destinationWarehouse = findWarehouseByName(document.destination);
+  const originWarehouse = findWarehouseByName(document.origin);
 
-    if (!destinationWarehouse) {
-      throw new Error(`Armazém de destino não encontrado: ${document.destination}`);
-    }
+  if (!originWarehouse) {
+    throw new Error(`Armazém de origem não encontrado: ${document.origin}`);
   }
+
+  document.lines.forEach((line, index) => {
+    const rowNumber = index + 1;
+    const product = findProductByName(line.item);
+
+    if (!product) {
+      throw new Error(`Produto não encontrado na linha ${rowNumber}: ${line.item}`);
+    }
+
+    const requestedQty = Number(line.quantity) || 0;
+    const availableQty = getAvailableQty(product.id, originWarehouse.id);
+
+    if (requestedQty > availableQty) {
+      throw new Error(
+        `Stock insuficiente para ${product.name} no armazém ${originWarehouse.name}. Disponível: ${availableQty}, solicitado: ${requestedQty}.`
+      );
+    }
+  });
 }
 
 function validateDocumentBeforePosting(document) {
@@ -278,6 +343,189 @@ function validateDocumentBeforePosting(document) {
   validateDocumentStock(document);
 }
 
+function createStockMove({
+  documentId,
+  date,
+  movementType,
+  direction,
+  productId,
+  warehouseId,
+  qty,
+  unitCost,
+  referenceText = '',
+  isReversal = false,
+}) {
+  ensureStockStructures();
+
+  const safeQty = Number(qty) || 0;
+  const safeUnitCost = Number(unitCost) || 0;
+
+  const balance = getOrCreateStockBalance(productId, warehouseId);
+
+  if (direction === 'out') {
+    const currentQty = Number(balance.qty_on_hand || 0);
+    const nextQty = currentQty - safeQty;
+
+    if (nextQty < 0) {
+      throw new Error('Operação bloqueada: o movimento deixaria o stock negativo.');
+    }
+
+    balance.qty_on_hand = nextQty;
+  } else if (direction === 'in') {
+    const currentQty = Number(balance.qty_on_hand || 0);
+    const currentAvg = Number(balance.avg_unit_cost || 0);
+    const nextQty = currentQty + safeQty;
+
+    if (nextQty > 0) {
+      balance.avg_unit_cost =
+        ((currentQty * currentAvg) + (safeQty * safeUnitCost)) / nextQty;
+    } else {
+      balance.avg_unit_cost = safeUnitCost;
+    }
+
+    balance.qty_on_hand = nextQty;
+  }
+
+  recalculateBalance(balance);
+
+  const move = {
+    id: crypto.randomUUID(),
+    date: date || new Date().toISOString(),
+    movement_type: movementType,
+    direction,
+    product_id: productId,
+    warehouse_id: warehouseId,
+    qty: safeQty,
+    unit_cost: safeUnitCost,
+    total_cost: safeQty * safeUnitCost,
+    reference_document_id: documentId || null,
+    reference_text: referenceText || '',
+    is_reversal: Boolean(isReversal),
+  };
+
+  state.stockMoves.push(move);
+
+  return move;
+}
+
+function createStockMovesFromDocument(document, { isReversal = false } = {}) {
+  if (!document) {
+    throw new Error('Documento inválido para geração de movimentos.');
+  }
+
+  const originWarehouse = findWarehouseByName(document.origin);
+  const destinationWarehouse = findWarehouseByName(document.destination);
+
+  const movementDate = isReversal
+    ? new Date().toISOString()
+    : document.postedAt || new Date().toISOString();
+
+  document.lines.forEach((line) => {
+    const product = findProductByName(line.item);
+
+    if (!product) {
+      throw new Error(`Produto não encontrado para a linha: ${line.item}`);
+    }
+
+    const qty = Number(line.quantity) || 0;
+    const unitCost = Number(line.unitPrice) || 0;
+
+    if (document.type === 'Transferência') {
+      if (!originWarehouse) {
+        throw new Error(`Armazém de origem não encontrado: ${document.origin}`);
+      }
+
+      if (!destinationWarehouse) {
+        throw new Error(`Armazém de destino não encontrado: ${document.destination}`);
+      }
+
+      if (!isReversal) {
+        createStockMove({
+          documentId: document.id,
+          date: movementDate,
+          movementType: 'transfer_out',
+          direction: 'out',
+          productId: product.id,
+          warehouseId: originWarehouse.id,
+          qty,
+          unitCost,
+          referenceText: `Transferência ${document.number}`,
+        });
+
+        createStockMove({
+          documentId: document.id,
+          date: movementDate,
+          movementType: 'transfer_in',
+          direction: 'in',
+          productId: product.id,
+          warehouseId: destinationWarehouse.id,
+          qty,
+          unitCost,
+          referenceText: `Transferência ${document.number}`,
+        });
+      } else {
+        createStockMove({
+          documentId: document.id,
+          date: movementDate,
+          movementType: 'transfer_reversal_in',
+          direction: 'in',
+          productId: product.id,
+          warehouseId: originWarehouse.id,
+          qty,
+          unitCost,
+          referenceText: `Reversão ${document.number}`,
+          isReversal: true,
+        });
+
+        createStockMove({
+          documentId: document.id,
+          date: movementDate,
+          movementType: 'transfer_reversal_out',
+          direction: 'out',
+          productId: product.id,
+          warehouseId: destinationWarehouse.id,
+          qty,
+          unitCost,
+          referenceText: `Reversão ${document.number}`,
+          isReversal: true,
+        });
+      }
+    }
+
+    if (document.type === 'Ajuste') {
+      if (!destinationWarehouse) {
+        throw new Error(`Armazém de destino não encontrado: ${document.destination}`);
+      }
+
+      if (!isReversal) {
+        createStockMove({
+          documentId: document.id,
+          date: movementDate,
+          movementType: 'adjustment_in',
+          direction: 'in',
+          productId: product.id,
+          warehouseId: destinationWarehouse.id,
+          qty,
+          unitCost,
+          referenceText: `Ajuste ${document.number}`,
+        });
+      } else {
+        createStockMove({
+          documentId: document.id,
+          date: movementDate,
+          movementType: 'adjustment_reversal_out',
+          direction: 'out',
+          productId: product.id,
+          warehouseId: destinationWarehouse.id,
+          qty,
+          unitCost,
+          referenceText: `Reversão ${document.number}`,
+          isReversal: true,
+        });
+      }
+    }
+  });
+}
 
 
 export function getState() {
@@ -444,6 +692,7 @@ export function postDocument(documentId) {
 
   return document;
 }
+
 export function cancelDocument(documentId, reason = '') {
   const document = getDocumentById(documentId);
 
