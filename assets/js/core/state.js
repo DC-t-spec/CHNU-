@@ -527,6 +527,59 @@ function createStockMovesFromDocument(document, { isReversal = false } = {}) {
   });
 }
 
+function getDraftDocumentOrThrow(documentId) {
+  const document = getDocumentById(documentId);
+
+  if (!document) {
+    throw new Error('Documento não encontrado.');
+  }
+
+  if (document.status !== 'draft') {
+    throw new Error('Apenas documentos em draft podem ser alterados.');
+  }
+
+  return document;
+}
+
+function createDocumentLine({ item, quantity, unitPrice }) {
+  const safeQuantity = Number(quantity) || 0;
+  const safeUnitPrice = Number(unitPrice) || 0;
+
+  return {
+    id: crypto.randomUUID(),
+    item: item || '',
+    quantity: safeQuantity,
+    unitPrice: safeUnitPrice,
+    total: calculateLineTotal(safeQuantity, safeUnitPrice),
+  };
+}
+
+function calculateLineTotal(quantity, unitPrice) {
+  return Number(quantity) * Number(unitPrice);
+}
+
+function recalculateDocumentTotals(document) {
+  const linesCount = document.lines.length;
+  const grandTotal = document.lines.reduce((sum, line) => {
+    return sum + Number(line.total || 0);
+  }, 0);
+
+  document.totals = {
+    linesCount,
+    grandTotal,
+  };
+
+  return document.totals;
+}
+
+function generateDocumentNumber() {
+  const nextNumber = state.documents.length + 1;
+  return `DOC-${String(nextNumber).padStart(4, '0')}`;
+}
+
+// ==============================
+// EXPORTS
+// ==============================
 
 export function getState() {
   return state;
@@ -535,27 +588,25 @@ export function getState() {
 export function getDocuments() {
   return [...state.documents];
 }
-export function searchDocuments({ query = '', status = '', sortBy = 'date_desc' }) {
+
+export function searchDocuments({ query = '', status = '', sortBy = 'date_desc' } = {}) {
   let results = [...state.documents];
 
-  // FILTRO POR TEXTO
   if (query) {
     const q = query.toLowerCase();
 
-    results = results.filter(documentData =>
+    results = results.filter((documentData) =>
       documentData.number.toLowerCase().includes(q) ||
       documentData.type.toLowerCase().includes(q) ||
-      (documentData.source || '').toLowerCase().includes(q) ||
+      (documentData.origin || '').toLowerCase().includes(q) ||
       (documentData.destination || '').toLowerCase().includes(q)
     );
   }
 
-  // FILTRO POR STATUS
   if (status) {
-    results = results.filter(documentData => documentData.status === status);
+    results = results.filter((documentData) => documentData.status === status);
   }
 
-  // ORDENAÇÃO
   switch (sortBy) {
     case 'date_desc':
       results.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -577,6 +628,7 @@ export function searchDocuments({ query = '', status = '', sortBy = 'date_desc' 
       results.sort((a, b) => new Date(b.date) - new Date(a.date));
       break;
   }
+
   return results;
 }
 
@@ -713,58 +765,6 @@ export function cancelDocument(documentId, reason = '') {
   return document;
 }
 
-
-
-function getDraftDocumentOrThrow(documentId) {
-  const document = getDocumentById(documentId);
-
-  if (!document) {
-    throw new Error('Documento não encontrado.');
-  }
-
-  if (document.status !== 'draft') {
-    throw new Error('Apenas documentos em draft podem ser alterados.');
-  }
-
-  return document;
-}
-
-function createDocumentLine({ item, quantity, unitPrice }) {
-  const safeQuantity = Number(quantity) || 0;
-  const safeUnitPrice = Number(unitPrice) || 0;
-
-  return {
-    id: crypto.randomUUID(),
-    item: item || '',
-    quantity: safeQuantity,
-    unitPrice: safeUnitPrice,
-    total: calculateLineTotal(safeQuantity, safeUnitPrice),
-  };
-}
-
-function calculateLineTotal(quantity, unitPrice) {
-  return Number(quantity) * Number(unitPrice);
-}
-
-function recalculateDocumentTotals(document) {
-  const linesCount = document.lines.length;
-  const grandTotal = document.lines.reduce((sum, line) => {
-    return sum + Number(line.total || 0);
-  }, 0);
-
-  document.totals = {
-    linesCount,
-    grandTotal,
-  };
-
-  return document.totals;
-}
-
-function generateDocumentNumber() {
-  const nextNumber = state.documents.length + 1;
-  return `DOC-${String(nextNumber).padStart(4, '0')}`;
-}
-
 export function getProducts() {
   return state.products || [];
 }
@@ -780,214 +780,3 @@ export function getStockBalances() {
 export function getStockMoves() {
   return state.stockMoves || [];
 }
-
-
-
-
-
-function getOrCreateStockBalance(productId, warehouseId) {
-  ensureStockStructures();
-
-  let balance = state.stockBalances.find(
-    (item) => item.product_id === productId && item.warehouse_id === warehouseId
-  );
-
-  if (!balance) {
-    balance = {
-      id: crypto.randomUUID(),
-      product_id: productId,
-      warehouse_id: warehouseId,
-      qty_on_hand: 0,
-      qty_reserved: 0,
-      qty_available: 0,
-      avg_unit_cost: 0,
-      total_cost: 0,
-    };
-
-    state.stockBalances.push(balance);
-  }
-
-  return balance;
-}
-
-function recalculateBalance(balance) {
-  balance.qty_available = Number(balance.qty_on_hand || 0) - Number(balance.qty_reserved || 0);
-  balance.total_cost = Number(balance.qty_on_hand || 0) * Number(balance.avg_unit_cost || 0);
-  return balance;
-}
-
-function createStockMove({
-  documentId,
-  date,
-  movementType,
-  direction,
-  productId,
-  warehouseId,
-  qty,
-  unitCost,
-  referenceText = '',
-  isReversal = false,
-}) 
-{
-  const safeQty = Number(qty) || 0;
-  const safeUnitCost = Number(unitCost) || 0;
-
-  const move = {
-    id: crypto.randomUUID(),
-    date: date || new Date().toISOString(),
-    movement_type: movementType,
-    direction,
-    product_id: productId,
-    warehouse_id: warehouseId,
-    qty: safeQty,
-    unit_cost: safeUnitCost,
-    total_cost: safeQty * safeUnitCost,
-    reference_document_id: documentId || null,
-    reference_text: referenceText || '',
-    is_reversal: Boolean(isReversal),
-  };
-
-  state.stockMoves.push(move);
-
-  const balance = getOrCreateStockBalance(productId, warehouseId);
-
-   if (direction === 'out') {
-    const currentQty = Number(balance.qty_on_hand || 0);
-    const nextQty = currentQty - safeQty;
-
-    if (nextQty < 0) {
-      throw new Error('Operação bloqueada: o movimento deixaria o stock negativo.');
-    }
-
-    balance.qty_on_hand = nextQty;
-  }
-
-  if (direction === 'out') {
-    balance.qty_on_hand = Number(balance.qty_on_hand || 0) - safeQty;
-  }
-
-  recalculateBalance(balance);
-
-  return move;
-}
-
-function createStockMovesFromDocument(document, { isReversal = false } = {}) {
-  if (!document) {
-    throw new Error('Documento inválido para geração de movimentos.');
-  }
-
-  const originWarehouse = findWarehouseByName(document.origin);
-  const destinationWarehouse = findWarehouseByName(document.destination);
-
-  const movementDate = isReversal
-    ? new Date().toISOString()
-    : document.postedAt || new Date().toISOString();
-
-  document.lines.forEach((line) => {
-    const product = findProductByName(line.item);
-
-    if (!product) {
-      throw new Error(`Produto não encontrado para a linha: ${line.item}`);
-    }
-
-    const qty = Number(line.quantity) || 0;
-    const unitCost = Number(line.unitPrice) || 0;
-
-    if (document.type === 'Transferência') {
-      if (!originWarehouse) {
-        throw new Error(`Armazém de origem não encontrado: ${document.origin}`);
-      }
-
-      if (!destinationWarehouse) {
-        throw new Error(`Armazém de destino não encontrado: ${document.destination}`);
-      }
-
-      if (!isReversal) {
-        createStockMove({
-          documentId: document.id,
-          date: movementDate,
-          movementType: 'transfer_out',
-          direction: 'out',
-          productId: product.id,
-          warehouseId: originWarehouse.id,
-          qty,
-          unitCost,
-          referenceText: `Transferência ${document.number}`,
-        });
-
-        createStockMove({
-          documentId: document.id,
-          date: movementDate,
-          movementType: 'transfer_in',
-          direction: 'in',
-          productId: product.id,
-          warehouseId: destinationWarehouse.id,
-          qty,
-          unitCost,
-          referenceText: `Transferência ${document.number}`,
-        });
-      } else {
-        createStockMove({
-          documentId: document.id,
-          date: movementDate,
-          movementType: 'transfer_reversal_in',
-          direction: 'in',
-          productId: product.id,
-          warehouseId: originWarehouse.id,
-          qty,
-          unitCost,
-          referenceText: `Reversão ${document.number}`,
-          isReversal: true,
-        });
-
-        createStockMove({
-          documentId: document.id,
-          date: movementDate,
-          movementType: 'transfer_reversal_out',
-          direction: 'out',
-          productId: product.id,
-          warehouseId: destinationWarehouse.id,
-          qty,
-          unitCost,
-          referenceText: `Reversão ${document.number}`,
-          isReversal: true,
-        });
-      }
-    }
-
-    if (document.type === 'Ajuste') {
-      if (!destinationWarehouse) {
-        throw new Error(`Armazém de destino não encontrado: ${document.destination}`);
-      }
-
-      if (!isReversal) {
-        createStockMove({
-          documentId: document.id,
-          date: movementDate,
-          movementType: 'adjustment_in',
-          direction: 'in',
-          productId: product.id,
-          warehouseId: destinationWarehouse.id,
-          qty,
-          unitCost,
-          referenceText: `Ajuste ${document.number}`,
-        });
-      } else {
-        createStockMove({
-          documentId: document.id,
-          date: movementDate,
-          movementType: 'adjustment_reversal_out',
-          direction: 'out',
-          productId: product.id,
-          warehouseId: destinationWarehouse.id,
-          qty,
-          unitCost,
-          referenceText: `Reversão ${document.number}`,
-          isReversal: true,
-        });
-      }
-    }
-  });
-}
-
-
