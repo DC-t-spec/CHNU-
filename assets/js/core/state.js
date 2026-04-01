@@ -783,17 +783,7 @@ export function getStockMoves() {
 
 
 
-function findWarehouseByName(name) {
-  return (state.warehouses || []).find(
-    (warehouse) => normalizeText(warehouse.name) === normalizeText(name)
-  ) || null;
-}
 
-function findProductByName(name) {
-  return (state.products || []).find(
-    (product) => normalizeText(product.name) === normalizeText(name)
-  ) || null;
-}
 
 function ensureStockStructures() {
   if (!Array.isArray(state.stockMoves)) {
