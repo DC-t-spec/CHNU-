@@ -176,11 +176,19 @@ function findWarehouseByName(name) {
   );
 }
 
-function findProductByName(name) {
+function findProduct(value) {
+  const lookup = normalizeText(value);
+
+  if (!lookup) return null;
+
   return (
-    (state.products || []).find(
-      (product) => normalizeText(product.name) === normalizeText(name)
-    ) || null
+    (state.products || []).find((product) => {
+      return (
+        normalizeText(product.id) === lookup ||
+        normalizeText(product.name) === lookup ||
+        normalizeText(product.sku) === lookup
+      );
+    }) || null
   );
 }
 
@@ -265,7 +273,7 @@ function validateDocumentLines(document) {
       throw new Error(`A linha ${rowNumber} tem custo/preço unitário inválido.`);
     }
 
-    const product = findProductByName(line.item);
+  const product = findProduct(line.item);
     if (!product) {
       throw new Error(`Produto não encontrado na linha ${rowNumber}: ${line.item}`);
     }
@@ -312,7 +320,7 @@ function validateDocumentStock(document) {
 
   document.lines.forEach((line, index) => {
     const rowNumber = index + 1;
-    const product = findProductByName(line.item);
+  const product = findProduct(line.item);
 
     if (!product) {
       throw new Error(`Produto não encontrado na linha ${rowNumber}: ${line.item}`);
@@ -421,7 +429,7 @@ function createStockMovesFromDocument(document, { isReversal = false } = {}) {
     : document.postedAt || new Date().toISOString();
 
   document.lines.forEach((line) => {
-    const product = findProductByName(line.item);
+const product = findProduct(line.item);
 
     if (!product) {
       throw new Error(`Produto não encontrado para a linha: ${line.item}`);
@@ -525,6 +533,11 @@ function createStockMovesFromDocument(document, { isReversal = false } = {}) {
       }
     }
   });
+}
+
+function getProductLabel(product, fallback = '') {
+  if (!product) return fallback || 'Produto desconhecido';
+  return product.name || product.sku || product.id || fallback || 'Produto';
 }
 
 function getDraftDocumentOrThrow(documentId) {
