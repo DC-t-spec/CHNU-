@@ -1,11 +1,28 @@
-import { getProducts } from '../../core/state.js';
-
 import {
   addDocumentLine,
   getDocumentById,
+  getProducts,
   removeDocumentLine,
   updateDocumentLine,
 } from '../../core/state.js';
+
+function renderProductOptions(selectedValue = '') {
+  const products = getProducts() || [];
+
+  return `
+    <option value="">Selecionar produto</option>
+    ${products
+      .map((product) => {
+        const selected = product.name === selectedValue ? 'selected' : '';
+        return `
+          <option value="${product.name}" ${selected}>
+            ${product.name} (${product.sku || 'Sem SKU'})
+          </option>
+        `;
+      })
+      .join('')}
+  `;
+}
 
 export function renderDocumentLinesSection(document) {
   const isEditable = document.status === 'draft';
@@ -46,22 +63,6 @@ export function bindDocumentLinesEvents(documentId) {
     });
   }
 }
-function renderProductOptions() {
-  const products = getProducts() || [];
-
-  return `
-    <option value="">Selecionar produto</option>
-    ${products
-      .map(
-        (product) => `
-        <option value="${product.name}">
-          ${product.name} (${product.sku || 'Sem SKU'})
-        </option>
-      `
-      )
-      .join('')}
-  `;
-}
 
 function renderLineForm(documentId) {
   return `
@@ -69,14 +70,14 @@ function renderLineForm(documentId) {
       <div class="line-form__grid">
         <div class="form-field">
           <label for="line-item">Item</label>
-         <select id="line-item" name="item" required>
-  ${renderProductOptions()}
-</select>
+          <select id="line-item" name="item" required>
+            ${renderProductOptions()}
+          </select>
         </div>
 
         <div class="form-field">
           <label for="line-quantity">Quantidade</label>
-          <input id="line-quantity" name="quantity" type="number" min="0" step="0.01" placeholder="0" required />
+          <input id="line-quantity" name="quantity" type="number" min="0.01" step="0.01" placeholder="0" required />
         </div>
 
         <div class="form-field">
@@ -184,25 +185,25 @@ function handleAddLine(event, documentId) {
     unitPrice: Number(formData.get('unitPrice')),
   };
 
-  // 🔒 validação profissional
   if (!payload.item) {
     alert('Seleciona um produto válido.');
     return;
   }
 
-  if (!payload.quantity || payload.quantity <= 0) {
-    alert('Quantidade inválida.');
+  if (!Number.isFinite(payload.quantity) || payload.quantity <= 0) {
+    alert('A quantidade deve ser maior que zero.');
     return;
   }
 
-  if (payload.unitPrice < 0) {
-    alert('Preço inválido.');
+  if (!Number.isFinite(payload.unitPrice) || payload.unitPrice < 0) {
+    alert('O preço unitário é inválido.');
     return;
   }
 
   addDocumentLine(documentId, payload);
   window.location.hash = `#documents/edit?id=${documentId}`;
 }
+
 function handleLineTableClick(event, documentId) {
   const trigger = event.target.closest('[data-action]');
   if (!trigger) return;
@@ -229,13 +230,21 @@ function openLineEditPrompt(documentId, lineId) {
   const line = documentData.lines.find((entry) => entry.id === lineId);
   if (!line) return;
 
- const products = getProducts();
-const exists = products.some(p => p.name === nextItem.trim());
+  const products = getProducts() || [];
+  const allowedProductNames = products.map((product) => product.name);
 
-if (!exists) {
-  alert('Produto inválido.');
-  return;
-}
+  const nextItem = window.prompt(
+    `Editar item:\nProdutos válidos: ${allowedProductNames.join(', ')}`,
+    line.item
+  );
+  if (nextItem === null) return;
+
+  const normalizedItem = nextItem.trim();
+
+  if (!allowedProductNames.includes(normalizedItem)) {
+    alert('Produto inválido. Escolhe um produto existente no catálogo.');
+    return;
+  }
 
   const nextQuantity = window.prompt('Editar quantidade:', String(line.quantity));
   if (nextQuantity === null) return;
@@ -243,10 +252,23 @@ if (!exists) {
   const nextUnitPrice = window.prompt('Editar preço unitário:', String(line.unitPrice));
   if (nextUnitPrice === null) return;
 
+  const quantity = Number(nextQuantity);
+  const unitPrice = Number(nextUnitPrice);
+
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    alert('Quantidade inválida.');
+    return;
+  }
+
+  if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+    alert('Preço unitário inválido.');
+    return;
+  }
+
   updateDocumentLine(documentId, lineId, {
-    item: nextItem.trim(),
-    quantity: Number(nextQuantity),
-    unitPrice: Number(nextUnitPrice),
+    item: normalizedItem,
+    quantity,
+    unitPrice,
   });
 
   window.location.hash = `#documents/edit?id=${documentId}`;
