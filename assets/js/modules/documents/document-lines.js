@@ -1,10 +1,10 @@
+import { getProducts } from '../../core/state.js';
 import {
-  addDocumentLine,
-  getDocumentById,
-  getProducts,
-  removeDocumentLine,
-  updateDocumentLine,
-} from '../../core/state.js';
+  addLineToDocument,
+  updateLineInDocument,
+  removeLineFromDocument,
+  getDocumentDetails,
+} from './documents.service.js';
 
 function renderProductOptions(selectedValue = '') {
   const products = getProducts() || [];
@@ -25,7 +25,7 @@ function renderProductOptions(selectedValue = '') {
 }
 
 export function renderDocumentLinesSection(document) {
-  const isEditable = document.status === 'draft';
+  const isEditable = document.canEdit;
 
   return `
     <div class="card">
@@ -36,11 +36,7 @@ export function renderDocumentLinesSection(document) {
         </div>
       </div>
 
-      ${
-        isEditable
-          ? renderLineForm(document.id)
-          : ''
-      }
+      ${isEditable ? renderLineForm(document.id) : ''}
 
       ${renderLinesTable(document)}
       ${renderLinesTotals(document)}
@@ -50,15 +46,17 @@ export function renderDocumentLinesSection(document) {
 
 export function bindDocumentLinesEvents(documentId) {
   const addForm = document.querySelector('#document-line-form');
+
   if (addForm) {
     addForm.addEventListener('submit', (event) => {
       handleAddLine(event, documentId);
     });
   }
 
-  const lineActions = document.querySelector('#document-lines-table');
-  if (lineActions) {
-    lineActions.addEventListener('click', (event) => {
+  const table = document.querySelector('#document-lines-table');
+
+  if (table) {
+    table.addEventListener('click', (event) => {
       handleLineTableClick(event, documentId);
     });
   }
@@ -66,27 +64,29 @@ export function bindDocumentLinesEvents(documentId) {
 
 function renderLineForm(documentId) {
   return `
-    <form id="document-line-form" class="line-form" data-document-id="${documentId}">
+    <form id="document-line-form" class="line-form">
       <div class="line-form__grid">
         <div class="form-field">
-          <label for="line-item">Item</label>
-          <select id="line-product-id" name="product_id" required>
+          <label>Item</label>
+          <select name="product_id" required>
             ${renderProductOptions()}
           </select>
         </div>
 
         <div class="form-field">
-          <label for="line-quantity">Quantidade</label>
-          <input id="line-quantity" name="quantity" type="number" min="0.01" step="0.01" placeholder="0" required />
+          <label>Quantidade</label>
+          <input name="quantity" type="number" min="0.01" step="0.01" required />
         </div>
 
         <div class="form-field">
-          <label for="line-unit-price">Preço unitário</label>
-          <input id="line-unit-price" name="unitPrice" type="number" min="0" step="0.01" placeholder="0.00" required />
+          <label>Preço unitário</label>
+          <input name="unitPrice" type="number" min="0" step="0.01" required />
         </div>
 
         <div class="line-form__actions">
-          <button type="submit" class="btn btn-primary">Adicionar linha</button>
+          <button type="submit" class="btn btn-primary">
+            Adicionar linha
+          </button>
         </div>
       </div>
     </form>
@@ -94,6 +94,8 @@ function renderLineForm(documentId) {
 }
 
 function renderLinesTable(documentData) {
+  const lines = documentData.lines || [];
+
   return `
     <div class="table-responsive">
       <table class="data-table" id="document-lines-table">
@@ -108,32 +110,22 @@ function renderLinesTable(documentData) {
         </thead>
         <tbody>
           ${
-            documentData.lines.length
-              ? documentData.lines.map((line) => `
+            lines.length
+              ? lines.map((line) => `
                 <tr>
-                  <td>${line.item}</td>
+                  <td>${escapeHtml(line.item)}</td>
                   <td>${formatNumber(line.quantity)}</td>
                   <td>${formatCurrency(line.unitPrice)}</td>
                   <td>${formatCurrency(line.total)}</td>
                   <td>
                     ${
-                      documentData.status === 'draft'
+                      documentData.canEdit
                         ? `
                           <div class="table-actions">
-                            <button
-                              type="button"
-                              class="btn btn-sm btn-secondary"
-                              data-action="edit-line"
-                              data-line-id="${line.id}"
-                            >
+                            <button class="btn btn-sm btn-secondary" data-action="edit" data-id="${line.id}">
                               Editar
                             </button>
-                            <button
-                              type="button"
-                              class="btn btn-sm btn-danger"
-                              data-action="remove-line"
-                              data-line-id="${line.id}"
-                            >
+                            <button class="btn btn-sm btn-danger" data-action="remove" data-id="${line.id}">
                               Remover
                             </button>
                           </div>
@@ -158,16 +150,21 @@ function renderLinesTable(documentData) {
 }
 
 function renderLinesTotals(documentData) {
+  const totals = documentData.totals || {
+    linesCount: 0,
+    grandTotal: 0,
+  };
+
   return `
     <div class="document-totals">
       <div class="document-totals__item">
-        <span class="document-totals__label">Total de linhas</span>
-        <strong class="document-totals__value">${documentData.totals.linesCount}</strong>
+        <span>Total de linhas</span>
+        <strong>${totals.linesCount}</strong>
       </div>
 
       <div class="document-totals__item document-totals__item--highlight">
-        <span class="document-totals__label">Total geral</span>
-        <strong class="document-totals__value">${formatCurrency(documentData.totals.grandTotal)}</strong>
+        <span>Total geral</span>
+        <strong>${formatCurrency(totals.grandTotal)}</strong>
       </div>
     </div>
   `;
@@ -176,12 +173,11 @@ function renderLinesTotals(documentData) {
 function handleAddLine(event, documentId) {
   event.preventDefault();
 
-  const form = event.currentTarget;
-  const formData = new FormData(form);
+  const formData = new FormData(event.currentTarget);
   const products = getProducts() || [];
 
-  const productId = formData.get('product_id')?.trim();
-  const product = products.find((entry) => entry.id === productId);
+  const productId = formData.get('product_id');
+  const product = products.find((p) => p.id === productId);
 
   const payload = {
     product_id: productId,
@@ -190,106 +186,64 @@ function handleAddLine(event, documentId) {
     unitPrice: Number(formData.get('unitPrice')),
   };
 
-  if (!payload.product_id || !product) {
-    alert('Seleciona um produto válido.');
-    return;
+  try {
+    addLineToDocument(documentId, payload);
+    window.location.hash = `#documents/edit?id=${documentId}`;
+  } catch (error) {
+    alert(error.message);
   }
-
-  if (!Number.isFinite(payload.quantity) || payload.quantity <= 0) {
-    alert('A quantidade deve ser maior que zero.');
-    return;
-  }
-
-  if (!Number.isFinite(payload.unitPrice) || payload.unitPrice < 0) {
-    alert('O preço unitário é inválido.');
-    return;
-  }
-
-  addDocumentLine(documentId, payload);
-  window.location.hash = `#documents/edit?id=${documentId}`;
 }
 
 function handleLineTableClick(event, documentId) {
-  const trigger = event.target.closest('[data-action]');
-  if (!trigger) return;
+  const btn = event.target.closest('[data-action]');
+  if (!btn) return;
 
-  const action = trigger.dataset.action;
-  const lineId = trigger.dataset.lineId;
-  if (!action || !lineId) return;
+  const action = btn.dataset.action;
+  const lineId = btn.dataset.id;
 
-  if (action === 'remove-line') {
-    removeDocumentLine(documentId, lineId);
+  if (action === 'remove') {
+    removeLineFromDocument(documentId, lineId);
     window.location.hash = `#documents/edit?id=${documentId}`;
-    return;
   }
 
-  if (action === 'edit-line') {
-    openLineEditPrompt(documentId, lineId);
+  if (action === 'edit') {
+    openEditPrompt(documentId, lineId);
   }
 }
 
-function openLineEditPrompt(documentId, lineId) {
-  const documentData = getDocumentById(documentId);
-  if (!documentData) return;
-
-  const line = documentData.lines.find((entry) => entry.id === lineId);
+function openEditPrompt(documentId, lineId) {
+  const doc = getDocumentDetails(documentId);
+  const line = doc.lines.find((l) => l.id === lineId);
   if (!line) return;
 
-  const products = getProducts() || [];
-  const allowedProductNames = products.map((product) => product.name);
+  const quantity = Number(prompt('Quantidade:', line.quantity));
+  const unitPrice = Number(prompt('Preço unitário:', line.unitPrice));
 
-  const nextItem = window.prompt(
-    `Editar item:\nProdutos válidos: ${allowedProductNames.join(', ')}`,
-    line.item
-  );
-  if (nextItem === null) return;
+  try {
+    updateLineInDocument(documentId, lineId, {
+      quantity,
+      unitPrice,
+    });
 
-  const normalizedItem = nextItem.trim();
-
-  if (!allowedProductNames.includes(normalizedItem)) {
-    alert('Produto inválido. Escolhe um produto existente no catálogo.');
-    return;
+    window.location.hash = `#documents/edit?id=${documentId}`;
+  } catch (error) {
+    alert(error.message);
   }
-
-  const nextQuantity = window.prompt('Editar quantidade:', String(line.quantity));
-  if (nextQuantity === null) return;
-
-  const nextUnitPrice = window.prompt('Editar preço unitário:', String(line.unitPrice));
-  if (nextUnitPrice === null) return;
-
-  const quantity = Number(nextQuantity);
-  const unitPrice = Number(nextUnitPrice);
-
-  if (!Number.isFinite(quantity) || quantity <= 0) {
-    alert('Quantidade inválida.');
-    return;
-  }
-
-  if (!Number.isFinite(unitPrice) || unitPrice < 0) {
-    alert('Preço unitário inválido.');
-    return;
-  }
-
-  updateDocumentLine(documentId, lineId, {
-    item: normalizedItem,
-    quantity,
-    unitPrice,
-  });
-
-  window.location.hash = `#documents/edit?id=${documentId}`;
 }
 
 function formatCurrency(value) {
-  const amount = Number(value) || 0;
-  return `${amount.toLocaleString('pt-PT', {
+  return `${(Number(value) || 0).toLocaleString('pt-PT', {
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
   })} MT`;
 }
 
 function formatNumber(value) {
-  return Number(value).toLocaleString('pt-PT', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  });
+  return Number(value || 0).toLocaleString('pt-PT');
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
 }
