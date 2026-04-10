@@ -99,6 +99,20 @@ function renderFilters(filters, options) {
           </select>
         </div>
 
+ <div class="toolbar__group">
+          <label class="toolbar__label" for="inventory-balances-status">Status</label>
+          <select
+            id="inventory-balances-status"
+            name="status"
+            class="toolbar__select"
+          >
+            <option value="" ${filters.status === '' ? 'selected' : ''}>Todos</option>
+            <option value="out" ${filters.status === 'out' ? 'selected' : ''}>Sem stock</option>
+            <option value="low" ${filters.status === 'low' ? 'selected' : ''}>Stock baixo</option>
+            <option value="ok" ${filters.status === 'ok' ? 'selected' : ''}>Saudável</option>
+          </select>
+        </div>
+
         <div class="toolbar__group">
           <label class="toolbar__label" for="inventory-balances-sort">Ordenar</label>
           <select
@@ -168,7 +182,7 @@ function renderBalancesTable(rows) {
                     <td>${formatNumber(row.qty_available)}</td>
                     <td>${formatCurrency(row.avg_unit_cost)}</td>
                     <td>${formatCurrency(row.total_cost)}</td>
-                      <td>${getStockStatusBadge(row.qty_available)}</td>
+                    <td>${getStockStatusBadge(row.stock_status)}</td>
                   </tr>
                 `
               )
@@ -222,13 +236,13 @@ function bindBalancesPageEvents(pagination) {
     updateInventoryPageFilters({
       query: formData.get('query') || '',
       warehouse: formData.get('warehouse') || '',
+      status: formData.get('status') || '',
       sortBy: formData.get('sortBy') || 'product_asc',
       page: 1,
     });
-  });
 
   resetButton?.addEventListener('click', () => {
-    resetInventoryPageFilters(['query', 'warehouse', 'sortBy', 'page']);
+resetInventoryPageFilters(['query', 'warehouse', 'status', 'sortBy', 'page']);
   });
 
   prevButton?.addEventListener('click', () => {
