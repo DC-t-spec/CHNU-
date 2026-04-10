@@ -1,9 +1,8 @@
+import { getWarehouses } from '../../core/state.js';
 import {
-  getDocumentById,
-  createDocument,
-  updateDocument,
-  getWarehouses,
-} from '../../core/state.js';
+  getDocumentForEditing,
+  saveDocument,
+} from './documents.service.js';
 import {
   bindDocumentLinesEvents,
   renderDocumentLinesSection,
@@ -41,32 +40,24 @@ export async function renderDocumentFormPage({ route, params }) {
   const appRoot = document.querySelector('#app');
   const isEditMode = route === '/documents/edit';
   const documentId = params.id;
-  const existingDocument = isEditMode ? getDocumentById(documentId) : null;
 
-  if (isEditMode && !existingDocument) {
-    appRoot.innerHTML = `
-      <section class="page-shell">
-        <div class="card">
-          <h2>Documento não encontrado</h2>
-          <p>Não foi possível abrir o documento para edição.</p>
-          <a href="#documents" class="btn btn-primary">Voltar à lista</a>
-        </div>
-      </section>
-    `;
-    return;
-  }
+  let existingDocument = null;
 
-  if (isEditMode && existingDocument.status !== 'draft') {
-    appRoot.innerHTML = `
-      <section class="page-shell">
-        <div class="card">
-          <h2>Edição não permitida</h2>
-          <p>Apenas documentos em draft podem ser editados.</p>
-          <a href="#documents/view?id=${existingDocument.id}" class="btn btn-primary">Ver documento</a>
-        </div>
-      </section>
-    `;
-    return;
+  if (isEditMode) {
+    try {
+      existingDocument = getDocumentForEditing(documentId);
+    } catch (error) {
+      appRoot.innerHTML = `
+        <section class="page-shell">
+          <div class="card">
+            <h2>${error.message === 'Documento não encontrado.' ? 'Documento não encontrado' : 'Edição não permitida'}</h2>
+            <p>${escapeHtml(error.message || 'Não foi possível abrir o documento para edição.')}</p>
+            <a href="#documents" class="btn btn-primary">Voltar à lista</a>
+          </div>
+        </section>
+      `;
+      return;
+    }
   }
 
   const documentData = existingDocument || {
@@ -99,7 +90,7 @@ export async function renderDocumentFormPage({ route, params }) {
           <div class="form-grid">
             <div class="form-field">
               <label for="date">Data</label>
-              <input id="date" name="date" type="date" value="${documentData.date}" required />
+              <input id="date" name="date" type="date" value="${escapeHtml(documentData.date || '')}" required />
             </div>
 
             <div class="form-field">
@@ -147,7 +138,7 @@ export async function renderDocumentFormPage({ route, params }) {
 
   bindDocumentForm();
 
-  if (isEditMode) {
+  if (isEditMode && existingDocument?.id) {
     bindDocumentLinesEvents(existingDocument.id);
   }
 }
@@ -200,11 +191,17 @@ function handleDocumentSubmit(event) {
   const formData = new FormData(form);
 
   const payload = {
-    date: formData.get('date')?.trim(),
-    type: formData.get('type')?.trim(),
-    origin: formData.get('origin')?.trim(),
-    destination: formData.get('destination')?.trim(),
+    id: form.dataset.id || undefined,
+    date: formData.get('date')?.toString().trim() || '',
+    type: formData.get('type')?.toString().trim() || '',
+    origin: formData.get('origin')?.toString().trim() || '',
+    destination: formData.get('destination')?.toString().trim() || '',
   };
+
+  if (!payload.date) {
+    alert('Selecciona a data do documento.');
+    return;
+  }
 
   if (!payload.type) {
     alert('Selecciona o tipo de documento.');
@@ -238,14 +235,26 @@ function handleDocumentSubmit(event) {
   }
 
   const mode = form.dataset.mode;
-  const id = form.dataset.id;
 
-  if (mode === 'edit' && id) {
-    updateDocument(id, payload);
-    window.location.hash = `#documents/view?id=${id}`;
-    return;
+  try {
+    const savedDocument = saveDocument(payload);
+
+    if (mode === 'edit' && savedDocument?.id) {
+      window.location.hash = `#documents/view?id=${savedDocument.id}`;
+      return;
+    }
+
+    window.location.hash = `#documents/edit?id=${savedDocument.id}`;
+  } catch (error) {
+    alert(error.message || 'Não foi possível guardar o documento.');
   }
+}
 
-  const createdDocument = createDocument(payload);
-  window.location.hash = `#documents/edit?id=${createdDocument.id}`;
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
