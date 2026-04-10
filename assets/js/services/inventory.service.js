@@ -7,9 +7,6 @@ import {
 } from '../core/state.js';
 
 function safeNumber(value, fallback = 0) {
-  const num = Number(value);
-  return Number.isFinite(num) ? num : fallback;
-}
 
 function formatReferenceLabel(move, documentsMap) {
   if (!move) return '—';
@@ -35,12 +32,9 @@ function enrichBalanceRow(balance, productsMap, warehousesMap) {
       : qtyOnHand - qtyReserved;
 
   const avgUnitCost = safeNumber(balance.avg_unit_cost);
-  const totalCost =
-    balance.total_cost != null
-      ? safeNumber(balance.total_cost)
-      : qtyOnHand * avgUnitCost;
 
-  return {
+
+     return {
     ...balance,
     product_name: product?.name || 'Produto sem nome',
     product_sku: product?.sku || '—',
@@ -50,6 +44,10 @@ function enrichBalanceRow(balance, productsMap, warehousesMap) {
     qty_available: qtyAvailable,
     avg_unit_cost: avgUnitCost,
     total_cost: totalCost,
+    stock_status: stockStatus,
+  };
+    total_cost: totalCost,
+    stock_status: stockStatus,
   };
 }
 
@@ -135,12 +133,22 @@ export function getInventoryBalanceSummary() {
     0
   );
 
+  const totalOutOfStock = balances.filter(
+    (row) => row.stock_status === 'out'
+  ).length;
+
+  const totalLowStock = balances.filter(
+    (row) => row.stock_status === 'low'
+  ).length;
+
   return {
     total_items: totalItems,
     total_qty_on_hand: totalQtyOnHand,
     total_qty_reserved: totalQtyReserved,
     total_qty_available: totalQtyAvailable,
     total_stock_value: totalStockValue,
+    total_out_of_stock: totalOutOfStock,
+    total_low_stock: totalLowStock,
   };
 }
 
@@ -194,6 +202,7 @@ function matchesText(row, query) {
 export function searchInventoryBalances({
   query = '',
   warehouse = '',
+  status = '',
   sortBy = 'product_asc',
 } = {}) {
   let rows = [...getInventoryBalances()];
@@ -205,6 +214,11 @@ export function searchInventoryBalances({
   if (warehouse) {
     rows = rows.filter(
       (row) => normalizeText(row.warehouse_name) === normalizeText(warehouse)
+    );
+  }
+    if (status) {
+    rows = rows.filter(
+      (row) => normalizeText(row.stock_status) === normalizeText(status)
     );
   }
 
@@ -353,5 +367,33 @@ export function getInventoryFilterOptions() {
   return {
     warehouses: [...warehouseSet].sort((a, b) => a.localeCompare(b)),
     movementTypes: [...movementTypeSet].sort((a, b) => a.localeCompare(b)),
+  };
+}
+
+export function getInventoryBalancesPageData({
+  query = '',
+  warehouse = '',
+  status = '',
+  sortBy = 'product_asc',
+  page = 1,
+  pageSize = 10,
+} = {}) {
+  const summary = getInventoryBalanceSummary();
+  const options = getInventoryFilterOptions();
+
+  const rows = searchInventoryBalances({
+    query,
+    warehouse,
+    status,
+    sortBy,
+  });
+
+  const { items, pagination } = paginateInventoryRows(rows, page, pageSize);
+
+  return {
+    summary,
+    options,
+    items,
+    pagination,
   };
 }
