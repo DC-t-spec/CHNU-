@@ -1,4 +1,4 @@
-import { cancelDocument } from '../../core/state.js';
+import { executeDocumentCancel } from './documents.service.js';
 import { showConfirm } from '../../ui/confirm.js';
 import { showToast } from '../../ui/toast.js';
 import { showInputModal } from '../../ui/modal.js';
@@ -7,6 +7,7 @@ export async function handleDocumentCancel(documentId, options = {}) {
   const {
     redirectTo = 'detail',
     onSuccess = null,
+    userId = 'system',
   } = options;
 
   const confirmed = await showConfirm({
@@ -37,7 +38,7 @@ export async function handleDocumentCancel(documentId, options = {}) {
   }
 
   try {
-    cancelDocument(documentId, reason.trim());
+    executeDocumentCancel(documentId, reason.trim(), userId);
 
     showToast({
       message: 'Documento cancelado com sucesso.',
