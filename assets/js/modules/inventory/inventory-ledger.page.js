@@ -1,21 +1,24 @@
 import {
-  getInventoryLedger,
   getInventoryLedgerSummary,
   searchInventoryLedger,
   paginateInventoryRows,
   getInventoryFilterOptions,
 } from '../../services/inventory.service.js';
+
 import {
   getInventoryPageFilters,
   updateInventoryPageFilters,
   resetInventoryPageFilters,
 } from './inventory-filters.js';
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 15;
 
 function formatNumber(value) {
   return new Intl.NumberFormat('pt-PT').format(Number(value || 0));
 }
+
+
+
 
 function formatCurrency(value) {
   return new Intl.NumberFormat('pt-PT', {
@@ -199,7 +202,7 @@ function renderLedgerTable(rows) {
       <div class="table-responsive">
         <table class="table">
           <thead>
-            <tr>
+           <tr class="ledger-row ledger-row--${row.direction}">
               <th>Data</th>
               <th>Produto</th>
               <th>Armazém</th>
@@ -215,7 +218,7 @@ function renderLedgerTable(rows) {
             ${rows
               .map(
                 (row) => `
-                  <tr>
+                 <tr class="ledger-row ledger-row--${row.direction}">
                     <td>${formatDate(row.date)}</td>
                     <td>${row.product_name}</td>
                     <td>${row.warehouse_name}</td>
