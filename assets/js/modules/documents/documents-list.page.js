@@ -1,60 +1,22 @@
-import { searchDocuments } from '../../core/state.js';
+import { getDocumentsList } from './documents.service.js';
 import { handleDocumentPosting } from './document-posting.js';
 import { handleDocumentCancel } from './document-cancel.js';
 
-// 👇 AQUI (fora de qualquer função)
-let currentSort = {
-  field: 'date',
-  direction: 'desc',
-};
+const DEFAULT_PAGE_SIZE = 5;
 
-
-let currentPage = 1;
-const pageSize = 5;
-
-function paginateDocuments(list) {
-  const start = (currentPage - 1) * pageSize;
-  const end = start + pageSize;
-  return list.slice(start, end);
-}
-
-function sortDocuments(list) {
-  const { field, direction } = currentSort;
-
-  return [...list].sort((a, b) => {
-    let valA = a[field];
-    let valB = b[field];
-
-    if (field === 'date') {
-      valA = new Date(valA);
-      valB = new Date(valB);
-    }
-
-    if (valA < valB) return direction === 'asc' ? -1 : 1;
-    if (valA > valB) return direction === 'asc' ? 1 : -1;
-    return 0;
-  });
-}
 export async function renderDocumentsListPage() {
   const appRoot = document.querySelector('#app');
-
   const filters = getCurrentListFilters();
-const documents = searchDocuments({
-  query: filters.query,
-  status: filters.status === 'all' ? null : filters.status,
-});
-  const allDocuments = searchDocuments({});
 
-const documentCounters = {
-  total: allDocuments.length,
-  draft: allDocuments.filter((doc) => doc.status === 'draft').length,
-  posted: allDocuments.filter((doc) => doc.status === 'posted').length,
-  cancelled: allDocuments.filter((doc) => doc.status === 'cancelled').length,
-};
+  const result = getDocumentsList({
+    query: filters.query,
+    status: filters.status,
+    sortBy: filters.sortBy,
+    page: filters.page,
+    pageSize: DEFAULT_PAGE_SIZE,
+  });
 
- 
-
-  const totalPages = Math.ceil(documents.length / pageSize);
+  const { items, summaries, pagination } = result;
 
   appRoot.innerHTML = `
     <section class="page-shell documents-page">
@@ -69,27 +31,27 @@ const documentCounters = {
         </div>
       </div>
 
-<div class="documents-stats-grid">
-  <div class="documents-stat-card">
-    <span class="documents-stat-card__label">Total</span>
-    <strong class="documents-stat-card__value">${documentCounters.total}</strong>
-  </div>
+      <div class="documents-stats-grid">
+        <div class="documents-stat-card">
+          <span class="documents-stat-card__label">Total</span>
+          <strong class="documents-stat-card__value">${summaries.total}</strong>
+        </div>
 
-  <div class="documents-stat-card">
-    <span class="documents-stat-card__label">Draft</span>
-    <strong class="documents-stat-card__value">${documentCounters.draft}</strong>
-  </div>
+        <div class="documents-stat-card">
+          <span class="documents-stat-card__label">Draft</span>
+          <strong class="documents-stat-card__value">${summaries.draft}</strong>
+        </div>
 
-  <div class="documents-stat-card">
-    <span class="documents-stat-card__label">Posted</span>
-    <strong class="documents-stat-card__value">${documentCounters.posted}</strong>
-  </div>
+        <div class="documents-stat-card">
+          <span class="documents-stat-card__label">Posted</span>
+          <strong class="documents-stat-card__value">${summaries.posted}</strong>
+        </div>
 
-  <div class="documents-stat-card">
-    <span class="documents-stat-card__label">Cancelled</span>
-    <strong class="documents-stat-card__value">${documentCounters.cancelled}</strong>
-  </div>
-</div>
+        <div class="documents-stat-card">
+          <span class="documents-stat-card__label">Cancelled</span>
+          <strong class="documents-stat-card__value">${summaries.cancelled}</strong>
+        </div>
+      </div>
 
       <div class="card toolbar-card">
         <form id="documents-toolbar-form" class="toolbar toolbar--filters">
@@ -124,14 +86,16 @@ const documentCounters = {
 
       <div class="card">
         ${
-          documents.length
+          items.length
             ? `
               <div class="table-responsive">
                 <table class="data-table">
                   <thead>
                     <tr>
                       <th>Número</th>
-                      <th data-sort="date" class="sortable">Data</th>
+                      <th data-sort="date" class="sortable">
+                        Data ${renderSortIndicator(filters.sortBy, 'date')}
+                      </th>
                       <th>Tipo</th>
                       <th>Origem</th>
                       <th>Destino</th>
@@ -140,81 +104,91 @@ const documentCounters = {
                     </tr>
                   </thead>
                   <tbody>
-${paginateDocuments(sortDocuments(documents)).map((doc) => `
-                      <tr>
-                        <td>${doc.number}</td>
-                        <td>${formatDocumentDate(doc.date)}</td>
-                        <td>${doc.type}</td>
-                        <td>${doc.origin}</td>
-                        <td>${doc.destination}</td>
-                        <td>
-                          <span class="status-chip status-${formatStatusLabel(doc.status)}">
-                           ${formatStatusLabel(doc.status)}
-                          </span>
-                        </td>
-                        <td>
-                          <div class="table-actions">
-                            <a href="#documents/view?id=${doc.id}" class="btn btn-sm btn-secondary">Ver</a>
+                    ${items
+                      .map(
+                        (doc) => `
+                          <tr>
+                            <td>${doc.number || '-'}</td>
+                            <td>${formatDocumentDate(doc.date)}</td>
+                            <td>${doc.type || '-'}</td>
+                            <td>${doc.origin || '-'}</td>
+                            <td>${doc.destination || '-'}</td>
+                            <td>
+                              <span class="status-chip status-${doc.status}">
+                                ${doc.statusLabel}
+                              </span>
+                            </td>
+                            <td>
+                              <div class="table-actions">
+                                <a href="#documents/view?id=${doc.id}" class="btn btn-sm btn-secondary">Ver</a>
 
-                            ${
-                              doc.status === 'draft'
-                                ? `
-                                  <a href="#documents/edit?id=${doc.id}" class="btn btn-sm btn-primary">Editar</a>
-                                  <button
-                                    type="button"
-                                    class="btn btn-sm btn-success"
-                                    data-action="post-document"
-                                    data-document-id="${doc.id}"
-                                  >
-                                    Postar
-                                  </button>
-                                `
-                                : ''
-                            }
+                                ${
+                                  doc.canEdit
+                                    ? `
+                                      <a href="#documents/edit?id=${doc.id}" class="btn btn-sm btn-primary">Editar</a>
+                                    `
+                                    : ''
+                                }
 
-                            ${
-                              doc.status === 'posted'
-                                ? `
-                                  <button
-                                    type="button"
-                                    class="btn btn-sm btn-danger"
-                                    data-action="cancel-document"
-                                    data-document-id="${doc.id}"
-                                  >
-                                    Cancelar
-                                  </button>
-                                `
-                                : ''
-                            }
-                          </div>
-                        </td>
-                      </tr>
-                    `).join('')}
+                                ${
+                                  doc.canPost
+                                    ? `
+                                      <button
+                                        type="button"
+                                        class="btn btn-sm btn-success"
+                                        data-action="post-document"
+                                        data-document-id="${doc.id}"
+                                      >
+                                        Postar
+                                      </button>
+                                    `
+                                    : ''
+                                }
+
+                                ${
+                                  doc.canCancel
+                                    ? `
+                                      <button
+                                        type="button"
+                                        class="btn btn-sm btn-danger"
+                                        data-action="cancel-document"
+                                        data-document-id="${doc.id}"
+                                      >
+                                        Cancelar
+                                      </button>
+                                    `
+                                    : ''
+                                }
+                              </div>
+                            </td>
+                          </tr>
+                        `
+                      )
+                      .join('')}
                   </tbody>
                 </table>
-                </div>
+              </div>
 
-<div class="pagination">
-  <button 
-    class="btn btn-secondary"
-    data-page="prev"
-    ${currentPage === 1 ? 'disabled' : ''}
-  >
-    Anterior
-  </button>
+              <div class="pagination">
+                <button
+                  class="btn btn-secondary"
+                  data-page="prev"
+                  ${pagination.hasPrev ? '' : 'disabled'}
+                >
+                  Anterior
+                </button>
 
-  <span class="pagination-info">
-    Página ${currentPage} de ${totalPages || 1}
-  </span>
+                <span class="pagination-info">
+                  Página ${pagination.page} de ${pagination.totalPages}
+                </span>
 
-  <button 
-    class="btn btn-secondary"
-    data-page="next"
-    ${currentPage >= totalPages ? 'disabled' : ''}
-  >
-    Próxima
-  </button>
-</div>
+                <button
+                  class="btn btn-secondary"
+                  data-page="next"
+                  ${pagination.hasNext ? '' : 'disabled'}
+                >
+                  Próxima
+                </button>
               </div>
             `
             : `
@@ -232,21 +206,12 @@ ${paginateDocuments(sortDocuments(documents)).map((doc) => `
   bindDocumentsListEvents();
 }
 
-function formatStatusLabel(status) {
-  const map = {
-    draft: 'Rascunho',
-    posted: 'Postado',
-    cancelled: 'Cancelado',
-  };
-
-  return map[status] || status;
-}
-
-
 function bindDocumentsListEvents() {
   const toolbarForm = document.querySelector('#documents-toolbar-form');
   const resetButton = document.querySelector('#documents-reset-filters');
   const appRoot = document.querySelector('#app');
+  const sortHeaders = document.querySelectorAll('[data-sort]');
+  const paginationButtons = document.querySelectorAll('[data-page]');
 
   if (toolbarForm) {
     toolbarForm.addEventListener('submit', handleToolbarSubmit);
@@ -259,41 +224,14 @@ function bindDocumentsListEvents() {
   if (appRoot) {
     appRoot.addEventListener('click', handleListActionClick);
   }
-const headers = document.querySelectorAll('[data-sort]');
-headers.forEach((header) => {
-  header.addEventListener('click', () => {
-    const field = header.dataset.sort;
 
-    if (currentSort.field === field) {
-      currentSort.direction =
-        currentSort.direction === 'asc' ? 'desc' : 'asc';
-    } else {
-      currentSort.field = field;
-      currentSort.direction = 'asc';
-    }
-
-    window.dispatchEvent(new HashChangeEvent('hashchange'));
+  sortHeaders.forEach((header) => {
+    header.addEventListener('click', handleSortClick);
   });
-});
 
-const paginationButtons = document.querySelectorAll('[data-page]');
-
-paginationButtons.forEach((btn) => {
-  btn.addEventListener('click', () => {
-    const action = btn.dataset.page;
-
-    if (action === 'prev' && currentPage > 1) {
-      currentPage--;
-    }
-
-    if (action === 'next') {
-      currentPage++;
-    }
-
-    window.dispatchEvent(new HashChangeEvent('hashchange'));
+  paginationButtons.forEach((button) => {
+    button.addEventListener('click', handlePaginationClick);
   });
-});
-  
 }
 
 async function handleListActionClick(event) {
@@ -322,6 +260,7 @@ async function handleListActionClick(event) {
 function handleToolbarSubmit(event) {
   event.preventDefault();
 
+  const currentFilters = getCurrentListFilters();
   const form = event.currentTarget;
   const formData = new FormData(form);
 
@@ -338,12 +277,59 @@ function handleToolbarSubmit(event) {
     params.set('status', status);
   }
 
+  if (currentFilters.sortBy && currentFilters.sortBy !== 'dateDesc') {
+    params.set('sortBy', currentFilters.sortBy);
+  }
+
+  params.set('page', '1');
+
   const queryString = params.toString();
   window.location.hash = queryString ? `#documents?${queryString}` : '#documents';
 }
 
 function handleToolbarReset() {
   window.location.hash = '#documents';
+}
+
+function handleSortClick(event) {
+  const field = event.currentTarget.dataset.sort;
+  const filters = getCurrentListFilters();
+  const params = buildParamsFromFilters(filters);
+
+  if (field === 'date') {
+    const nextSort = filters.sortBy === 'dateAsc' ? 'dateDesc' : 'dateAsc';
+
+    if (nextSort !== 'dateDesc') {
+      params.set('sortBy', nextSort);
+    } else {
+      params.delete('sortBy');
+    }
+  }
+
+  params.set('page', '1');
+
+  const queryString = params.toString();
+  window.location.hash = queryString ? `#documents?${queryString}` : '#documents';
+}
+
+function handlePaginationClick(event) {
+  const action = event.currentTarget.dataset.page;
+  const filters = getCurrentListFilters();
+  const nextPage =
+    action === 'prev'
+      ? Math.max(1, filters.page - 1)
+      : filters.page + 1;
+
+  const params = buildParamsFromFilters(filters);
+
+  if (nextPage > 1) {
+    params.set('page', String(nextPage));
+  } else {
+    params.delete('page');
+  }
+
+  const queryString = params.toString();
+  window.location.hash = queryString ? `#documents?${queryString}` : '#documents';
 }
 
 function getCurrentListFilters() {
@@ -354,7 +340,40 @@ function getCurrentListFilters() {
   return {
     query: params.get('query') || '',
     status: params.get('status') || 'all',
+    sortBy: params.get('sortBy') || 'dateDesc',
+    page: Number(params.get('page') || 1),
   };
+}
+
+function buildParamsFromFilters(filters) {
+  const params = new URLSearchParams();
+
+  if (filters.query) {
+    params.set('query', filters.query);
+  }
+
+  if (filters.status && filters.status !== 'all') {
+    params.set('status', filters.status);
+  }
+
+  if (filters.sortBy && filters.sortBy !== 'dateDesc') {
+    params.set('sortBy', filters.sortBy);
+  }
+
+  if (filters.page && filters.page > 1) {
+    params.set('page', String(filters.page));
+  }
+
+  return params;
+}
+
+function renderSortIndicator(sortBy, field) {
+  if (field !== 'date') return '';
+
+  if (sortBy === 'dateAsc') return '↑';
+  if (sortBy === 'dateDesc') return '↓';
+
+  return '';
 }
 
 function formatDocumentDate(value) {
