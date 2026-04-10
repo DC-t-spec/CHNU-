@@ -205,3 +205,85 @@ function getStatusLabel(status) {
       return status || '-';
   }
 }
+export function addLineToDocument(documentId, payload) {
+  const doc = getDocumentById(documentId);
+
+  if (!doc) {
+    throw new Error('Documento não encontrado.');
+  }
+
+  if (doc.status !== 'draft') {
+    throw new Error('Só é possível adicionar linhas em documentos draft.');
+  }
+
+  if (!payload?.product_id) {
+    throw new Error('Produto inválido.');
+  }
+
+  if (!payload.item?.trim()) {
+    throw new Error('Item inválido.');
+  }
+
+  if (!Number.isFinite(Number(payload.quantity)) || Number(payload.quantity) <= 0) {
+    throw new Error('Quantidade inválida.');
+  }
+
+  if (!Number.isFinite(Number(payload.unitPrice)) || Number(payload.unitPrice) < 0) {
+    throw new Error('Preço unitário inválido.');
+  }
+
+  return addDocumentLine(documentId, {
+    product_id: payload.product_id,
+    item: payload.item.trim(),
+    quantity: Number(payload.quantity),
+    unitPrice: Number(payload.unitPrice),
+  });
+}
+
+export function updateLineInDocument(documentId, lineId, payload) {
+  const doc = getDocumentById(documentId);
+
+  if (!doc) {
+    throw new Error('Documento não encontrado.');
+  }
+
+  if (doc.status !== 'draft') {
+    throw new Error('Só é possível editar linhas em documentos draft.');
+  }
+
+  if (!lineId) {
+    throw new Error('Linha inválida.');
+  }
+
+  if (!Number.isFinite(Number(payload.quantity)) || Number(payload.quantity) <= 0) {
+    throw new Error('Quantidade inválida.');
+  }
+
+  if (!Number.isFinite(Number(payload.unitPrice)) || Number(payload.unitPrice) < 0) {
+    throw new Error('Preço unitário inválido.');
+  }
+
+  return updateDocumentLine(documentId, lineId, {
+    ...payload,
+    quantity: Number(payload.quantity),
+    unitPrice: Number(payload.unitPrice),
+  });
+}
+
+export function removeLineFromDocument(documentId, lineId) {
+  const doc = getDocumentById(documentId);
+
+  if (!doc) {
+    throw new Error('Documento não encontrado.');
+  }
+
+  if (doc.status !== 'draft') {
+    throw new Error('Só é possível remover linhas em documentos draft.');
+  }
+
+  if (!lineId) {
+    throw new Error('Linha inválida.');
+  }
+
+  return removeDocumentLine(documentId, lineId);
+}
