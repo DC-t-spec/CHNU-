@@ -227,7 +227,11 @@ function renderLedgerTable(rows) {
                     <td>${formatNumber(row.qty)}</td>
                     <td>${formatCurrency(row.unit_cost)}</td>
                     <td>${formatCurrency(row.total_cost)}</td>
-                    <td>${row.reference_label || '-'}</td>
+                    <td>
+  ${row.reference_id 
+    ? `<a href="#/documents/view?id=${row.reference_id}" class="link">${row.reference_label}</a>`
+    : '-'}
+</td>
                   </tr>
                 `
               )
