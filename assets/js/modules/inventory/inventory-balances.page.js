@@ -18,6 +18,15 @@ function formatCurrency(value) {
   }).format(Number(value || 0));
 }
 
+function escapeHtml(value) {
+  return String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 function getStockStatusBadge(status) {
   if (status === 'out') {
     return `<span class="status-pill status-pill--danger">Sem stock</span>`;
@@ -29,6 +38,7 @@ function getStockStatusBadge(status) {
 
   return `<span class="status-pill status-pill--success">Saudável</span>`;
 }
+
 function renderSummaryCards(summary) {
   return `
     <section class="documents-stats-grid">
@@ -77,7 +87,7 @@ function renderFilters(filters, options) {
             class="toolbar__input"
             type="text"
             placeholder="Produto, SKU ou armazém"
-            value="${filters.query || ''}"
+            value="${escapeHtml(filters.query || '')}"
           />
         </div>
 
@@ -89,17 +99,17 @@ function renderFilters(filters, options) {
             class="toolbar__select"
           >
             <option value="">Todos</option>
-            ${options.warehouses
+            ${(options.warehouses || [])
               .map(
                 (item) => `
-                  <option value="${item}" ${filters.warehouse === item ? 'selected' : ''}>${item}</option>
+                  <option value="${escapeHtml(item)}" ${filters.warehouse === item ? 'selected' : ''}>${escapeHtml(item)}</option>
                 `
               )
               .join('')}
           </select>
         </div>
 
- <div class="toolbar__group">
+        <div class="toolbar__group">
           <label class="toolbar__label" for="inventory-balances-status">Status</label>
           <select
             id="inventory-balances-status"
@@ -166,7 +176,7 @@ function renderBalancesTable(rows) {
               <th>Qty available</th>
               <th>Custo médio</th>
               <th>Custo total</th>
-                  <th>Status</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody>
@@ -174,9 +184,9 @@ function renderBalancesTable(rows) {
               .map(
                 (row) => `
                   <tr>
-                    <td>${row.product_name}</td>
-                    <td>${row.product_sku}</td>
-                    <td>${row.warehouse_name}</td>
+                    <td>${escapeHtml(row.product_name)}</td>
+                    <td>${escapeHtml(row.product_sku)}</td>
+                    <td>${escapeHtml(row.warehouse_name)}</td>
                     <td>${formatNumber(row.qty_on_hand)}</td>
                     <td>${formatNumber(row.qty_reserved)}</td>
                     <td>${formatNumber(row.qty_available)}</td>
@@ -240,9 +250,10 @@ function bindBalancesPageEvents(pagination) {
       sortBy: formData.get('sortBy') || 'product_asc',
       page: 1,
     });
+  });
 
   resetButton?.addEventListener('click', () => {
-resetInventoryPageFilters(['query', 'warehouse', 'status', 'sortBy', 'page']);
+    resetInventoryPageFilters(['query', 'warehouse', 'status', 'sortBy', 'page']);
   });
 
   prevButton?.addEventListener('click', () => {
@@ -267,6 +278,8 @@ export async function renderInventoryBalancesPage() {
   if (!appRoot) return;
 
   const filters = getInventoryPageFilters({
+    query: '',
+    warehouse: '',
     status: '',
     sortBy: 'product_asc',
     page: 1,
@@ -280,6 +293,7 @@ export async function renderInventoryBalancesPage() {
     page: filters.page,
     pageSize: PAGE_SIZE,
   });
+
   appRoot.innerHTML = `
     <section class="page-shell inventory-balances-page">
       <section class="page-header">
