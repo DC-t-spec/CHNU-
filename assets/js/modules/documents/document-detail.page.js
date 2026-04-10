@@ -1,11 +1,11 @@
-import { getDocumentById } from '../../core/state.js';
+import { getDocumentDetails } from './documents.service.js';
 import { handleDocumentPosting } from './document-posting.js';
 import { handleDocumentCancel } from './document-cancel.js';
 
 export async function renderDocumentDetailPage({ params }) {
   const appRoot = window.document.querySelector('#app');
   const documentId = params.id;
-  const documentData = getDocumentById(documentId);
+  const documentData = getDocumentDetails(documentId);
 
   if (!documentData) {
     appRoot.innerHTML = `
@@ -20,6 +20,12 @@ export async function renderDocumentDetailPage({ params }) {
     return;
   }
 
+  const lines = Array.isArray(documentData.lines) ? documentData.lines : [];
+  const totals = documentData.totals || {
+    linesCount: lines.length,
+    grandTotal: 0,
+  };
+
   appRoot.innerHTML = `
     <section class="page-shell document-detail-page">
       <div class="page-header">
@@ -30,18 +36,21 @@ export async function renderDocumentDetailPage({ params }) {
 
         <div class="page-actions">
           <a href="#documents" class="btn btn-secondary">Voltar</a>
+
           ${
-            documentData.status === 'draft'
+            documentData.canEdit
               ? `<a href="#documents/edit?id=${documentData.id}" class="btn btn-secondary">Editar</a>`
               : ''
           }
+
           ${
-            documentData.status === 'draft'
+            documentData.canPost
               ? `<button type="button" class="btn btn-primary" id="post-document-button">Postar documento</button>`
               : ''
           }
+
           ${
-            documentData.status === 'posted'
+            documentData.canCancel
               ? `<button type="button" class="btn btn-danger" id="cancel-document-button">Cancelar documento</button>`
               : ''
           }
@@ -49,15 +58,15 @@ export async function renderDocumentDetailPage({ params }) {
       </div>
 
       <div class="card detail-grid">
-        <div><strong>Número</strong>${documentData.number}</div>
+        <div><strong>Número</strong>${documentData.number || '-'}</div>
         <div><strong>Data</strong>${formatDocumentDate(documentData.date)}</div>
-        <div><strong>Tipo</strong>${documentData.type}</div>
-        <div><strong>Origem</strong>${documentData.origin}</div>
-        <div><strong>Destino</strong>${documentData.destination}</div>
+        <div><strong>Tipo</strong>${documentData.type || '-'}</div>
+        <div><strong>Origem</strong>${documentData.origin || '-'}</div>
+        <div><strong>Destino</strong>${documentData.destination || '-'}</div>
         <div>
           <strong>Status</strong>
           <span class="status-chip status-${documentData.status}">
-            ${documentData.status}
+            ${documentData.statusLabel}
           </span>
         </div>
       </div>
@@ -83,7 +92,7 @@ export async function renderDocumentDetailPage({ params }) {
 
           <div class="operational-meta__item operational-meta__item--full">
             <span class="operational-meta__label">Motivo do cancelamento</span>
-            <strong class="operational-meta__value">${documentData.cancelReason || '-'}</strong>
+            <strong class="operational-meta__value">${escapeHtml(documentData.cancelReason || '-')}</strong>
           </div>
         </div>
       </div>
@@ -108,10 +117,10 @@ export async function renderDocumentDetailPage({ params }) {
             </thead>
             <tbody>
               ${
-                documentData.lines.length
-                  ? documentData.lines.map((line) => `
+                lines.length
+                  ? lines.map((line) => `
                     <tr>
-                      <td>${line.item}</td>
+                      <td>${escapeHtml(line.item || '-')}</td>
                       <td>${formatNumber(line.quantity)}</td>
                       <td>${formatCurrency(line.unitPrice)}</td>
                       <td>${formatCurrency(line.total)}</td>
@@ -132,36 +141,38 @@ export async function renderDocumentDetailPage({ params }) {
         <div class="document-totals">
           <div class="document-totals__item">
             <span class="document-totals__label">Total de linhas</span>
-            <strong class="document-totals__value">${documentData.totals.linesCount}</strong>
+            <strong class="document-totals__value">${totals.linesCount ?? lines.length}</strong>
           </div>
 
           <div class="document-totals__item document-totals__item--highlight">
             <span class="document-totals__label">Total geral</span>
-            <strong class="document-totals__value">${formatCurrency(documentData.totals.grandTotal)}</strong>
+            <strong class="document-totals__value">${formatCurrency(totals.grandTotal)}</strong>
           </div>
         </div>
       </div>
     </section>
   `;
 
-  bindDetailActions(documentData.id, documentData.status);
+  bindDetailActions(documentData);
 }
 
-function bindDetailActions(documentId, status) {
-  if (status === 'draft') {
+function bindDetailActions(documentData) {
+  if (documentData.canPost) {
     const postButton = window.document.querySelector('#post-document-button');
+
     if (postButton) {
-      postButton.addEventListener('click', () => {
-        handleDocumentPosting(documentId);
+      postButton.addEventListener('click', async () => {
+        await handleDocumentPosting(documentData.id);
       });
     }
   }
 
-  if (status === 'posted') {
+  if (documentData.canCancel) {
     const cancelButton = window.document.querySelector('#cancel-document-button');
+
     if (cancelButton) {
-      cancelButton.addEventListener('click', () => {
-        handleDocumentCancel(documentId);
+      cancelButton.addEventListener('click', async () => {
+        await handleDocumentCancel(documentData.id);
       });
     }
   }
@@ -169,6 +180,7 @@ function bindDetailActions(documentId, status) {
 
 function formatCurrency(value) {
   const amount = Number(value) || 0;
+
   return `${amount.toLocaleString('pt-PT', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -176,7 +188,7 @@ function formatCurrency(value) {
 }
 
 function formatNumber(value) {
-  return Number(value).toLocaleString('pt-PT', {
+  return Number(value || 0).toLocaleString('pt-PT', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });
@@ -201,4 +213,13 @@ function formatDateTime(value) {
   }
 
   return date.toLocaleString('pt-PT');
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
