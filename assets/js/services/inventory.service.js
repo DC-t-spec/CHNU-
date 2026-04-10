@@ -7,6 +7,17 @@ import {
 } from '../core/state.js';
 
 function safeNumber(value, fallback = 0) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+}
+
+function getStockStatus(qtyAvailable) {
+  const qty = safeNumber(qtyAvailable);
+
+  if (qty <= 0) return 'out';
+  if (qty <= 3) return 'low';
+  return 'ok';
+}
 
 function formatReferenceLabel(move, documentsMap) {
   if (!move) return '—';
@@ -32,9 +43,14 @@ function enrichBalanceRow(balance, productsMap, warehousesMap) {
       : qtyOnHand - qtyReserved;
 
   const avgUnitCost = safeNumber(balance.avg_unit_cost);
+  const totalCost =
+    balance.total_cost != null
+      ? safeNumber(balance.total_cost)
+      : qtyOnHand * avgUnitCost;
 
+  const stockStatus = getStockStatus(qtyAvailable);
 
-     return {
+  return {
     ...balance,
     product_name: product?.name || 'Produto sem nome',
     product_sku: product?.sku || '—',
@@ -43,9 +59,6 @@ function enrichBalanceRow(balance, productsMap, warehousesMap) {
     qty_reserved: qtyReserved,
     qty_available: qtyAvailable,
     avg_unit_cost: avgUnitCost,
-    total_cost: totalCost,
-    stock_status: stockStatus,
-  };
     total_cost: totalCost,
     stock_status: stockStatus,
   };
@@ -156,6 +169,7 @@ export function getInventoryLedgerSummary() {
   const ledger = getInventoryLedger();
 
   const totalMoves = ledger.length;
+
   const totalIn = ledger
     .filter((row) => row.direction === 'in')
     .reduce((sum, row) => sum + safeNumber(row.qty), 0);
@@ -216,7 +230,8 @@ export function searchInventoryBalances({
       (row) => normalizeText(row.warehouse_name) === normalizeText(warehouse)
     );
   }
-    if (status) {
+
+  if (status) {
     rows = rows.filter(
       (row) => normalizeText(row.stock_status) === normalizeText(status)
     );
