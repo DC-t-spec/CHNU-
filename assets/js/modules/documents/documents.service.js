@@ -5,6 +5,9 @@ import {
   updateDocument,
   postDocument,
   cancelDocument,
+  addDocumentLine,
+  updateDocumentLine,
+  removeDocumentLine,
 } from '../../core/state.js';
 
 export function getDocumentsList(params = {}) {
