@@ -9,6 +9,7 @@ export function getCurrentHash() {
   return window.location.hash || '#dashboard';
 }
 
+
 export function parseHash(hash = getCurrentHash()) {
   const cleanHash = hash.startsWith('#') ? hash.slice(1) : hash;
   const [pathPart, queryString = ''] = cleanHash.split('?');
