@@ -267,21 +267,19 @@ export async function renderInventoryBalancesPage() {
   if (!appRoot) return;
 
   const filters = getInventoryPageFilters({
+    status: '',
     sortBy: 'product_asc',
     page: 1,
   });
 
-  const summary = getInventoryBalanceSummary();
-  const options = getInventoryFilterOptions();
-
-  const rows = searchInventoryBalances({
+  const { summary, options, items, pagination } = getInventoryBalancesPageData({
     query: filters.query,
     warehouse: filters.warehouse,
+    status: filters.status,
     sortBy: filters.sortBy,
+    page: filters.page,
+    pageSize: PAGE_SIZE,
   });
-
-  const { items, pagination } = paginateInventoryRows(rows, filters.page, PAGE_SIZE);
-
   appRoot.innerHTML = `
     <section class="page-shell inventory-balances-page">
       <section class="page-header">
