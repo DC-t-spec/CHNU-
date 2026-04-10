@@ -1,9 +1,4 @@
-import {
-  getInventoryBalanceSummary,
-  searchInventoryBalances,
-  paginateInventoryRows,
-  getInventoryFilterOptions,
-} from '../../services/inventory.service.js';
+import { getInventoryBalancesPageData } from '../../services/inventory.service.js';
 import {
   getInventoryPageFilters,
   updateInventoryPageFilters,
@@ -23,20 +18,17 @@ function formatCurrency(value) {
   }).format(Number(value || 0));
 }
 
-function getStockStatusBadge(qty) {
-  const safeQty = Number(qty || 0);
-
-  if (safeQty <= 0) {
+function getStockStatusBadge(status) {
+  if (status === 'out') {
     return `<span class="status-pill status-pill--danger">Sem stock</span>`;
   }
 
-  if (safeQty <= 3) {
+  if (status === 'low') {
     return `<span class="status-pill status-pill--warning">Stock baixo</span>`;
   }
 
   return `<span class="status-pill status-pill--success">Saudável</span>`;
 }
-
 function renderSummaryCards(summary) {
   return `
     <section class="documents-stats-grid">
@@ -51,13 +43,23 @@ function renderSummaryCards(summary) {
       </article>
 
       <article class="documents-stat-card">
-        <span class="documents-stat-card__label">Qty reserved</span>
-        <strong class="documents-stat-card__value">${formatNumber(summary.total_qty_reserved)}</strong>
+        <span class="documents-stat-card__label">Qty available</span>
+        <strong class="documents-stat-card__value">${formatNumber(summary.total_qty_available)}</strong>
       </article>
 
       <article class="documents-stat-card">
         <span class="documents-stat-card__label">Valor total stock</span>
         <strong class="documents-stat-card__value">${formatCurrency(summary.total_stock_value)}</strong>
+      </article>
+
+      <article class="documents-stat-card">
+        <span class="documents-stat-card__label">Sem stock</span>
+        <strong class="documents-stat-card__value">${formatNumber(summary.total_out_of_stock)}</strong>
+      </article>
+
+      <article class="documents-stat-card">
+        <span class="documents-stat-card__label">Stock baixo</span>
+        <strong class="documents-stat-card__value">${formatNumber(summary.total_low_stock)}</strong>
       </article>
     </section>
   `;
