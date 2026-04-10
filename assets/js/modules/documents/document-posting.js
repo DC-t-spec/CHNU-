@@ -1,4 +1,4 @@
-import { postDocument } from '../../core/state.js';
+import { executeDocumentPosting } from './documents.service.js';
 import { showConfirm } from '../../ui/confirm.js';
 import { showToast } from '../../ui/toast.js';
 
@@ -6,6 +6,7 @@ export async function handleDocumentPosting(documentId, options = {}) {
   const {
     redirectTo = 'detail',
     onSuccess = null,
+    userId = 'system',
   } = options;
 
   const confirmed = await showConfirm({
@@ -18,7 +19,7 @@ export async function handleDocumentPosting(documentId, options = {}) {
   if (!confirmed) return;
 
   try {
-    postDocument(documentId);
+    executeDocumentPosting(documentId, userId);
 
     showToast({
       message: 'Documento postado com sucesso.',
