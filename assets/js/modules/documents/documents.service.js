@@ -11,9 +11,9 @@ export function getDocumentsList(params = {}) {
   const {
     query = '',
     status = 'all',
-    sortBy = 'documentDateDesc',
+    sortBy = 'dateDesc',
     page = 1,
-    pageSize = 10,
+    pageSize = 5,
   } = params;
 
   const allDocuments = getDocuments();
@@ -26,11 +26,9 @@ export function getDocumentsList(params = {}) {
     filtered = filtered.filter((doc) =>
       [
         doc.number,
-        doc.typeLabel,
-        doc.sourceLabel,
-        doc.destinationLabel,
-        doc.reference,
-        doc.notes,
+        doc.type,
+        doc.origin,
+        doc.destination,
         doc.status,
       ]
         .filter(Boolean)
@@ -50,7 +48,9 @@ export function getDocumentsList(params = {}) {
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const safePage = Math.min(Math.max(1, Number(page) || 1), totalPages);
   const startIndex = (safePage - 1) * pageSize;
-  const paginatedItems = filtered.slice(startIndex, startIndex + pageSize);
+  const endIndex = startIndex + pageSize;
+
+  const paginatedItems = filtered.slice(startIndex, endIndex);
 
   return {
     items: paginatedItems.map(mapDocumentListItem),
@@ -74,9 +74,7 @@ export function getDocumentsList(params = {}) {
 export function getDocumentDetails(documentId) {
   const doc = getDocumentById(documentId);
 
-  if (!doc) {
-    return null;
-  }
+  if (!doc) return null;
 
   return {
     ...doc,
@@ -145,6 +143,16 @@ function sortDocuments(documents, sortBy) {
   const sorted = [...documents];
 
   switch (sortBy) {
+    case 'dateAsc':
+      return sorted.sort(
+        (a, b) => new Date(a.date || 0) - new Date(b.date || 0)
+      );
+
+    case 'dateDesc':
+      return sorted.sort(
+        (a, b) => new Date(b.date || 0) - new Date(a.date || 0)
+      );
+
     case 'numberAsc':
       return sorted.sort((a, b) =>
         String(a.number || '').localeCompare(String(b.number || ''))
@@ -155,35 +163,9 @@ function sortDocuments(documents, sortBy) {
         String(b.number || '').localeCompare(String(a.number || ''))
       );
 
-    case 'dateAsc':
-      return sorted.sort(
-        (a, b) => new Date(a.documentDate || 0) - new Date(b.documentDate || 0)
-      );
-
-    case 'dateDesc':
-    case 'documentDateDesc':
-      return sorted.sort(
-        (a, b) => new Date(b.documentDate || 0) - new Date(a.documentDate || 0)
-      );
-
-    case 'statusAsc':
-      return sorted.sort((a, b) =>
-        String(a.status || '').localeCompare(String(b.status || ''))
-      );
-
-    case 'totalAsc':
-      return sorted.sort(
-        (a, b) => Number(a.grandTotal || 0) - Number(b.grandTotal || 0)
-      );
-
-    case 'totalDesc':
-      return sorted.sort(
-        (a, b) => Number(b.grandTotal || 0) - Number(a.grandTotal || 0)
-      );
-
     default:
       return sorted.sort(
-        (a, b) => new Date(b.documentDate || 0) - new Date(a.documentDate || 0)
+        (a, b) => new Date(b.date || 0) - new Date(a.date || 0)
       );
   }
 }
@@ -213,7 +195,7 @@ function getStatusLabel(status) {
     case 'draft':
       return 'Rascunho';
     case 'posted':
-      return 'Lançado';
+      return 'Postado';
     case 'cancelled':
       return 'Cancelado';
     default:
