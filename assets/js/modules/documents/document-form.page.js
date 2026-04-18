@@ -7,6 +7,7 @@ import {
   getWarehousesService,
 } from '../../services/documents.service.js';
 import { showToast } from '../../ui/toast.js';
+import { assertEditable } from '../../services/document-status.service.js';
 
 export async function renderDocumentFormPage(context = {}) {
   const appRoot = document.querySelector('#app');
