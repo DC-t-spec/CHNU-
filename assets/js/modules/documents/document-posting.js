@@ -1,50 +1,39 @@
-// assets/js/modules/documents/document-posting.js
-
-import {
-  previewDocumentPosting,
-  executeDocumentPosting,
-} from '../../services/document-posting.service.js';
-
 import { showConfirm } from '../../ui/confirm.js';
 import { showToast } from '../../ui/toast.js';
+import { postDocumentById } from '../../services/documents.service.js';
 
-export async function handleDocumentPosting(documentId, options = {}) {
-  if (!documentId) return false;
+export async function handleDocumentPosting(documentId) {
+  if (!documentId) {
+    showToast({
+      type: 'error',
+      message: 'Documento inválido.',
+    });
+    return;
+  }
 
-  const { redirectTo = 'detail' } = options;
+  const confirmed = await showConfirm({
+    title: 'Lançar documento',
+    message: 'Queres lançar este documento agora? Depois disso deixará de ser editável.',
+    confirmText: 'Lançar',
+    cancelText: 'Voltar',
+    tone: 'primary',
+  });
+
+  if (!confirmed) return;
 
   try {
-    const preview = previewDocumentPosting(documentId);
+    await postDocumentById(documentId);
 
-    const confirmed = await showConfirm({
-      title: 'Postar documento',
-      message: `Este documento vai gerar ${preview.expectedMovements} movimento(s) de stock. Desejas continuar?`,
-      confirmText: 'Postar',
-      cancelText: 'Voltar',
-      variant: 'success',
+    showToast({
+      type: 'success',
+      message: 'Documento lançado com sucesso.',
     });
 
-    if (!confirmed) {
-      return false;
-    }
-
-    const result = executeDocumentPosting(documentId);
-
-    showToast(
-      `Documento postado com sucesso. ${result.generatedMoves.length} movimento(s) gerado(s).`,
-      'success'
-    );
-
-    if (redirectTo === 'list') {
-      window.location.hash = '#documents';
-      return true;
-    }
-
     window.location.hash = `#documents/view?id=${documentId}`;
-    return true;
   } catch (error) {
-    console.error(error);
-    showToast(error?.message || 'Erro ao postar documento.', 'error');
-    return false;
+    showToast({
+      type: 'error',
+      message: error?.message || 'Falha ao lançar documento.',
+    });
   }
 }
