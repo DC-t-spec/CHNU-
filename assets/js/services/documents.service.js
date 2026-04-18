@@ -111,12 +111,7 @@ function applyFilters(list, filters = {}) {
     const q = normalizeText(filters.query);
 
     result = result.filter((doc) =>
-      [
-        doc.number,
-        doc.type,
-        doc.origin,
-        doc.destination,
-      ]
+      [doc.number, doc.type, doc.origin, doc.destination]
         .join(' ')
         .toLowerCase()
         .includes(q)
@@ -222,19 +217,11 @@ function findWarehouseByName(name) {
 function normalizeDocumentType(type) {
   const lookup = normalizeText(type);
 
-  if (
-    lookup === 'transferência' ||
-    lookup === 'transferencia' ||
-    lookup === 'transfer'
-  ) {
+  if (lookup === 'transferência' || lookup === 'transferencia' || lookup === 'transfer') {
     return 'Transferência';
   }
 
-  if (
-    lookup === 'ajuste' ||
-    lookup === 'entrada' ||
-    lookup === 'adjustment'
-  ) {
+  if (lookup === 'ajuste' || lookup === 'entrada' || lookup === 'adjustment') {
     return 'Ajuste';
   }
 
@@ -269,6 +256,112 @@ function normalizePayloadLine(line = {}) {
     item,
     quantity: Number(line.quantity || 0),
     unitPrice: Number(line.unitPrice || 0),
+  };
+}
+
+/* =========================================================
+   VALIDATION
+========================================================= */
+
+function assertDocumentExists(documentId) {
+  const document = getDocumentById(documentId);
+
+  if (!document) {
+    throw new Error('Documento não encontrado.');
+  }
+
+  return document;
+}
+
+function assertDraftDocument(documentId) {
+  const document = assertDocumentExists(documentId);
+
+  if (document.status !== 'draft') {
+    throw new Error('Apenas documentos em draft podem ser alterados.');
+  }
+
+  return document;
+}
+
+function validateHeaderPayload(payload = {}) {
+  if (!payload.date) {
+    throw new Error('Data obrigatória.');
+  }
+
+  const normalizedType = normalizeDocumentType(payload.type);
+
+  if (!normalizedType) {
+    throw new Error('Tipo obrigatório.');
+  }
+
+  const originName = resolveWarehouseName(payload.origin);
+  const destinationName = resolveWarehouseName(payload.destination);
+
+  if (normalizedType === 'Transferência') {
+    if (!originName) {
+      throw new Error('Origem obrigatória.');
+    }
+
+    if (!destinationName) {
+      throw new Error('Destino obrigatório.');
+    }
+
+    if (normalizeText(originName) === normalizeText(destinationName)) {
+      throw new Error('Origem e destino não podem ser iguais.');
+    }
+  }
+
+  if (normalizedType === 'Ajuste') {
+    if (!destinationName) {
+      throw new Error('Destino obrigatório.');
+    }
+  }
+
+  return {
+    date: payload.date,
+    type: normalizedType,
+    origin: normalizedType === 'Ajuste' ? '' : originName,
+    destination: destinationName,
+  };
+}
+
+function validateLinesPayload(lines = []) {
+  if (!Array.isArray(lines) || !lines.length) {
+    throw new Error('Adicione pelo menos uma linha.');
+  }
+
+  const normalizedLines = lines.map(normalizePayloadLine);
+
+  normalizedLines.forEach((line, index) => {
+    const row = index + 1;
+
+    if (!line.product_id) {
+      throw new Error(`Linha ${row}: selecione produto.`);
+    }
+
+    if (!findProductById(line.product_id)) {
+      throw new Error(`Linha ${row}: produto inválido.`);
+    }
+
+    if (!Number.isFinite(line.quantity) || line.quantity <= 0) {
+      throw new Error(`Linha ${row}: quantidade inválida.`);
+    }
+
+    if (!Number.isFinite(line.unitPrice) || line.unitPrice < 0) {
+      throw new Error(`Linha ${row}: preço inválido.`);
+    }
+  });
+
+  return normalizedLines;
+}
+
+function validateFullPayload(payload = {}) {
+  const header = validateHeaderPayload(payload);
+  const lines = validateLinesPayload(payload.lines || []);
+
+  return {
+    ...header,
+    lines,
   };
 }
 
@@ -365,23 +458,21 @@ export function getDocumentFormOptions() {
 ========================================================= */
 
 export function createNewDocument(payload = {}) {
+  const validated = validateFullPayload(payload);
+
   const created = createDocument({
-    date: payload.date || '',
-    type: normalizeDocumentType(payload.type),
-    origin: resolveWarehouseName(payload.origin),
-    destination: resolveWarehouseName(payload.destination),
+    date: validated.date,
+    type: validated.type,
+    origin: validated.origin,
+    destination: validated.destination,
   });
 
-  const lines = Array.isArray(payload.lines) ? payload.lines : [];
-
-  lines.forEach((line) => {
-    const normalizedLine = normalizePayloadLine(line);
-
+  validated.lines.forEach((line) => {
     addDocumentLine(created.id, {
-      product_id: normalizedLine.product_id,
-      item: normalizedLine.item,
-      quantity: normalizedLine.quantity,
-      unitPrice: normalizedLine.unitPrice,
+      product_id: line.product_id,
+      item: line.item,
+      quantity: line.quantity,
+      unitPrice: line.unitPrice,
     });
   });
 
@@ -389,28 +480,29 @@ export function createNewDocument(payload = {}) {
 }
 
 export function updateExistingDocument(documentId, payload = {}) {
+  assertDraftDocument(documentId);
+
+  const validated = validateFullPayload(payload);
+
   updateDocument(documentId, {
-    date: payload.date || '',
-    type: normalizeDocumentType(payload.type),
-    origin: resolveWarehouseName(payload.origin),
-    destination: resolveWarehouseName(payload.destination),
+    date: validated.date,
+    type: validated.type,
+    origin: validated.origin,
+    destination: validated.destination,
   });
 
   const currentLines = getDocumentLines(documentId) || [];
-  const nextLines = Array.isArray(payload.lines) ? payload.lines : [];
 
   currentLines.forEach((line) => {
     removeDocumentLine(documentId, line.id);
   });
 
-  nextLines.forEach((line) => {
-    const normalizedLine = normalizePayloadLine(line);
-
+  validated.lines.forEach((line) => {
     addDocumentLine(documentId, {
-      product_id: normalizedLine.product_id,
-      item: normalizedLine.item,
-      quantity: normalizedLine.quantity,
-      unitPrice: normalizedLine.unitPrice,
+      product_id: line.product_id,
+      item: line.item,
+      quantity: line.quantity,
+      unitPrice: line.unitPrice,
     });
   });
 
@@ -430,18 +522,37 @@ export function saveDocumentService(payload = {}) {
 ========================================================= */
 
 export function addDocumentLineService(documentId, lineData) {
+  assertDraftDocument(documentId);
+
+  const [validatedLine] = validateLinesPayload([lineData]);
+
   return normalizeLine(
-    addDocumentLine(documentId, normalizePayloadLine(lineData))
+    addDocumentLine(documentId, {
+      product_id: validatedLine.product_id,
+      item: validatedLine.item,
+      quantity: validatedLine.quantity,
+      unitPrice: validatedLine.unitPrice,
+    })
   );
 }
 
 export function updateDocumentLineService(documentId, lineId, lineData) {
+  assertDraftDocument(documentId);
+
+  const [validatedLine] = validateLinesPayload([lineData]);
+
   return normalizeLine(
-    updateDocumentLine(documentId, lineId, normalizePayloadLine(lineData))
+    updateDocumentLine(documentId, lineId, {
+      product_id: validatedLine.product_id,
+      item: validatedLine.item,
+      quantity: validatedLine.quantity,
+      unitPrice: validatedLine.unitPrice,
+    })
   );
 }
 
 export function removeDocumentLineService(documentId, lineId) {
+  assertDraftDocument(documentId);
   removeDocumentLine(documentId, lineId);
   return getDocument(documentId);
 }
