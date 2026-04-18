@@ -1,225 +1,112 @@
-import { getDocumentDetails } from './documents.service.js';
-import { handleDocumentPosting } from './document-posting.js';
-import { handleDocumentCancel } from './document-cancel.js';
+// assets/js/modules/documents/document-detail.page.js
 
-export async function renderDocumentDetailPage({ params }) {
-  const appRoot = window.document.querySelector('#app');
-  const documentId = params.id;
-  const documentData = getDocumentDetails(documentId);
+import {
+  getDocument,
+  postDocumentService,
+  cancelDocumentService,
+} from '../../services/documents.service.js';
 
-  if (!documentData) {
-    appRoot.innerHTML = `
-      <section class="page-shell">
-        <div class="card">
-          <h2>Documento não encontrado</h2>
-          <p>O documento solicitado não existe.</p>
-          <a href="#documents" class="btn btn-primary">Voltar à lista</a>
-        </div>
-      </section>
-    `;
+import { showConfirm } from '../../ui/confirm.js';
+import { showToast } from '../../ui/toast.js';
+
+export async function renderDocumentDetailPage(params = {}) {
+  const app = document.querySelector('#app');
+  const { id } = params;
+
+  const doc = getDocument(id);
+
+  if (!doc) {
+    app.innerHTML = `<div class="page"><h2>Document not found</h2></div>`;
     return;
   }
 
-  const lines = Array.isArray(documentData.lines) ? documentData.lines : [];
-  const totals = documentData.totals || {
-    linesCount: lines.length,
-    grandTotal: 0,
-  };
+  app.innerHTML = `
+    <div class="page">
 
-  appRoot.innerHTML = `
-    <section class="page-shell document-detail-page">
       <div class="page-header">
-        <div>
-          <h1>Documento ${documentData.number}</h1>
-          <p>Detalhe completo do documento</p>
-        </div>
+        <h1>Document ${doc.number}</h1>
+        <div class="actions">
+          <a href="#/documents" class="btn">Back</a>
 
-        <div class="page-actions">
-          <a href="#documents" class="btn btn-secondary">Voltar</a>
+          ${doc.status === 'draft' ? `
+            <a href="#/documents/${doc.id}/edit" class="btn">Edit</a>
+            <button id="post-btn" class="btn btn-primary">Post</button>
+          ` : ''}
 
-          ${
-            documentData.canEdit
-              ? `<a href="#documents/edit?id=${documentData.id}" class="btn btn-secondary">Editar</a>`
-              : ''
-          }
-
-          ${
-            documentData.canPost
-              ? `<button type="button" class="btn btn-primary" id="post-document-button">Postar documento</button>`
-              : ''
-          }
-
-          ${
-            documentData.canCancel
-              ? `<button type="button" class="btn btn-danger" id="cancel-document-button">Cancelar documento</button>`
-              : ''
-          }
-        </div>
-      </div>
-
-      <div class="card detail-grid">
-        <div><strong>Número</strong>${documentData.number || '-'}</div>
-        <div><strong>Data</strong>${formatDocumentDate(documentData.date)}</div>
-        <div><strong>Tipo</strong>${documentData.type || '-'}</div>
-        <div><strong>Origem</strong>${documentData.origin || '-'}</div>
-        <div><strong>Destino</strong>${documentData.destination || '-'}</div>
-        <div>
-          <strong>Status</strong>
-          <span class="status-chip status-${documentData.status}">
-            ${documentData.statusLabel}
-          </span>
-        </div>
-      </div>
-
-      <div class="card operational-meta">
-        <div class="section-header">
-          <div>
-            <h2>Informação operacional</h2>
-            <p>Eventos do ciclo de vida do documento</p>
-          </div>
-        </div>
-
-        <div class="operational-meta__grid">
-          <div class="operational-meta__item">
-            <span class="operational-meta__label">Postado em</span>
-            <strong class="operational-meta__value">${formatDateTime(documentData.postedAt)}</strong>
-          </div>
-
-          <div class="operational-meta__item">
-            <span class="operational-meta__label">Cancelado em</span>
-            <strong class="operational-meta__value">${formatDateTime(documentData.cancelledAt)}</strong>
-          </div>
-
-          <div class="operational-meta__item operational-meta__item--full">
-            <span class="operational-meta__label">Motivo do cancelamento</span>
-            <strong class="operational-meta__value">${escapeHtml(documentData.cancelReason || '-')}</strong>
-          </div>
+          ${doc.status === 'posted' ? `
+            <button id="cancel-btn" class="btn btn-danger">Cancel</button>
+          ` : ''}
         </div>
       </div>
 
       <div class="card">
-        <div class="section-header">
-          <div>
-            <h2>Linhas</h2>
-            <p>Resumo dos itens associados ao documento</p>
-          </div>
-        </div>
-
-        <div class="table-responsive">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>Quantidade</th>
-                <th>Preço unitário</th>
-                <th>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${
-                lines.length
-                  ? lines.map((line) => `
-                    <tr>
-                      <td>${escapeHtml(line.item || '-')}</td>
-                      <td>${formatNumber(line.quantity)}</td>
-                      <td>${formatCurrency(line.unitPrice)}</td>
-                      <td>${formatCurrency(line.total)}</td>
-                    </tr>
-                  `).join('')
-                  : `
-                    <tr>
-                      <td colspan="4" class="empty-state-cell">
-                        Nenhuma linha adicionada.
-                      </td>
-                    </tr>
-                  `
-              }
-            </tbody>
-          </table>
-        </div>
-
-        <div class="document-totals">
-          <div class="document-totals__item">
-            <span class="document-totals__label">Total de linhas</span>
-            <strong class="document-totals__value">${totals.linesCount ?? lines.length}</strong>
-          </div>
-
-          <div class="document-totals__item document-totals__item--highlight">
-            <span class="document-totals__label">Total geral</span>
-            <strong class="document-totals__value">${formatCurrency(totals.grandTotal)}</strong>
-          </div>
-        </div>
+        <div><strong>Status:</strong> ${doc.status}</div>
+        <div><strong>Date:</strong> ${doc.date}</div>
+        <div><strong>Type:</strong> ${doc.type}</div>
+        <div><strong>Origin:</strong> ${doc.origin || '-'}</div>
+        <div><strong>Destination:</strong> ${doc.destination || '-'}</div>
       </div>
-    </section>
+
+      <div class="card">
+        <h3>Lines</h3>
+
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Qty</th>
+              <th>Unit Price</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${doc.lines.map(line => `
+              <tr>
+                <td>${line.item}</td>
+                <td>${line.quantity}</td>
+                <td>${line.unitPrice || 0}</td>
+                <td>${(line.quantity * (line.unitPrice || 0))}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card total">
+        <h2>Total: ${doc.grandTotal}</h2>
+      </div>
+
+    </div>
   `;
 
-  bindDetailActions(documentData);
+  bindEvents(doc);
 }
 
-function bindDetailActions(documentData) {
-  if (documentData.canPost) {
-    const postButton = window.document.querySelector('#post-document-button');
+function bindEvents(doc) {
+  const postBtn = document.getElementById('post-btn');
+  const cancelBtn = document.getElementById('cancel-btn');
 
-    if (postButton) {
-      postButton.addEventListener('click', async () => {
-        await handleDocumentPosting(documentData.id);
-      });
-    }
+  if (postBtn) {
+    postBtn.addEventListener('click', async () => {
+      const confirm = await showConfirm('Post this document?');
+      if (!confirm) return;
+
+      await postDocumentService(doc.id);
+      showToast('Document posted');
+
+      location.hash = `#/documents/${doc.id}`;
+    });
   }
 
-  if (documentData.canCancel) {
-    const cancelButton = window.document.querySelector('#cancel-document-button');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', async () => {
+      const confirm = await showConfirm('Cancel this document?');
+      if (!confirm) return;
 
-    if (cancelButton) {
-      cancelButton.addEventListener('click', async () => {
-        await handleDocumentCancel(documentData.id);
-      });
-    }
+      await cancelDocumentService(doc.id, null, 'User cancel');
+      showToast('Document cancelled');
+
+      location.hash = `#/documents/${doc.id}`;
+    });
   }
-}
-
-function formatCurrency(value) {
-  const amount = Number(value) || 0;
-
-  return `${amount.toLocaleString('pt-PT', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })} MT`;
-}
-
-function formatNumber(value) {
-  return Number(value || 0).toLocaleString('pt-PT', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  });
-}
-
-function formatDocumentDate(value) {
-  if (!value) return '-';
-
-  const [year, month, day] = value.split('-');
-  if (!year || !month || !day) return value;
-
-  return `${day}/${month}/${year}`;
-}
-
-function formatDateTime(value) {
-  if (!value) return '-';
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString('pt-PT');
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
 }
