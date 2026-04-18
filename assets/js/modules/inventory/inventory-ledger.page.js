@@ -11,20 +11,26 @@ import {
   resetInventoryPageFilters,
 } from './inventory-filters.js';
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 10;
 
 function formatNumber(value) {
   return new Intl.NumberFormat('pt-PT').format(Number(value || 0));
 }
-
-
-
 
 function formatCurrency(value) {
   return new Intl.NumberFormat('pt-PT', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Number(value || 0));
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
 
 function formatDate(value) {
@@ -62,6 +68,10 @@ function getMovementTypeLabel(type) {
     transfer_reversal_out: 'Reversão saída',
     adjustment_in: 'Ajuste entrada',
     adjustment_reversal_out: 'Reversão ajuste',
+    sale: 'Venda',
+    purchase: 'Compra',
+    production_in: 'Produção entrada',
+    production_out: 'Produção saída',
   };
 
   return labels[type] || type || '-';
@@ -105,7 +115,7 @@ function renderFilters(filters, options) {
             class="toolbar__input"
             type="text"
             placeholder="Produto, SKU, documento ou movimento"
-            value="${filters.query || ''}"
+            value="${escapeHtml(filters.query || '')}"
           />
         </div>
 
@@ -117,10 +127,12 @@ function renderFilters(filters, options) {
             class="toolbar__select"
           >
             <option value="">Todos</option>
-            ${options.warehouses
+            ${(options.warehouses || [])
               .map(
                 (item) => `
-                  <option value="${item}" ${filters.warehouse === item ? 'selected' : ''}>${item}</option>
+                  <option value="${escapeHtml(item)}" ${filters.warehouse === item ? 'selected' : ''}>
+                    ${escapeHtml(item)}
+                  </option>
                 `
               )
               .join('')}
@@ -135,10 +147,12 @@ function renderFilters(filters, options) {
             class="toolbar__select"
           >
             <option value="">Todos</option>
-            ${options.movementTypes
+            ${(options.movementTypes || [])
               .map(
                 (item) => `
-                  <option value="${item}" ${filters.movementType === item ? 'selected' : ''}>${item}</option>
+                  <option value="${escapeHtml(item)}" ${filters.movementType === item ? 'selected' : ''}>
+                    ${escapeHtml(item)}
+                  </option>
                 `
               )
               .join('')}
@@ -202,7 +216,7 @@ function renderLedgerTable(rows) {
       <div class="table-responsive">
         <table class="table">
           <thead>
-           <tr class="ledger-row ledger-row--${row.direction}">
+            <tr>
               <th>Data</th>
               <th>Produto</th>
               <th>Armazém</th>
@@ -218,20 +232,16 @@ function renderLedgerTable(rows) {
             ${rows
               .map(
                 (row) => `
-                 <tr class="ledger-row ledger-row--${row.direction}">
+                  <tr class="ledger-row ledger-row--${escapeHtml(row.direction || '')}">
                     <td>${formatDate(row.date)}</td>
-                    <td>${row.product_name}</td>
-                    <td>${row.warehouse_name}</td>
-                    <td>${getMovementTypeLabel(row.movement_type)}</td>
+                    <td>${escapeHtml(row.product_name)}</td>
+                    <td>${escapeHtml(row.warehouse_name)}</td>
+                    <td>${escapeHtml(getMovementTypeLabel(row.movement_type || row.move_type))}</td>
                     <td>${getDirectionBadge(row.direction)}</td>
                     <td>${formatNumber(row.qty)}</td>
                     <td>${formatCurrency(row.unit_cost)}</td>
                     <td>${formatCurrency(row.total_cost)}</td>
-                    <td>
-  ${row.reference_id 
-    ? `<a href="#/documents/view?id=${row.reference_id}" class="link">${row.reference_label}</a>`
-    : '-'}
-</td>
+                    <td>${escapeHtml(row.reference_label || '-')}</td>
                   </tr>
                 `
               )
@@ -325,6 +335,10 @@ export async function renderInventoryLedgerPage() {
   if (!appRoot) return;
 
   const filters = getInventoryPageFilters({
+    query: '',
+    warehouse: '',
+    movementType: '',
+    direction: '',
     sortBy: 'date_desc',
     page: 1,
   });
