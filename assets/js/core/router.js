@@ -1,14 +1,12 @@
-
 const routes = new Map();
 
-export function registerRoute(path, handler) { 
+export function registerRoute(path, handler) {
   routes.set(path, handler);
 }
 
 export function getCurrentHash() {
   return window.location.hash || '#dashboard';
 }
-
 
 export function parseHash(hash = getCurrentHash()) {
   const cleanHash = hash.startsWith('#') ? hash.slice(1) : hash;
@@ -26,25 +24,56 @@ export function parseHash(hash = getCurrentHash()) {
   };
 }
 
-export function resolveRoute(hash = getCurrentHash()) {
-  const parsed = parseHash(hash);
+/* ===============================
+   MATCH ROUTE (SUPORTA :id)
+=============================== */
 
-  if (routes.has(parsed.fullPath)) {
-    return {
-      handler: routes.get(parsed.fullPath),
-      route: parsed.fullPath,
-      params: parsed.query,
-      segments: parsed.segments,
-    };
+function matchRoute(path) {
+  const parsed = parseHash(path);
+
+  for (const [routePath, handler] of routes.entries()) {
+    const routeSegments = routePath.split('/').filter(Boolean);
+    const urlSegments = parsed.segments;
+
+    if (routeSegments.length !== urlSegments.length) continue;
+
+    let params = {};
+    let match = true;
+
+    for (let i = 0; i < routeSegments.length; i++) {
+      const routeSeg = routeSegments[i];
+      const urlSeg = urlSegments[i];
+
+      if (routeSeg.startsWith(':')) {
+        const key = routeSeg.replace(':', '');
+        params[key] = urlSeg;
+      } else if (routeSeg !== urlSeg) {
+        match = false;
+        break;
+      }
+    }
+
+    if (match) {
+      return {
+        handler,
+        route: routePath,
+        params,
+        segments: urlSegments,
+      };
+    }
   }
 
   return {
     handler: null,
     route: null,
-    params: parsed.query,
+    params: {},
     segments: parsed.segments,
   };
 }
+
+/* ===============================
+   SIDEBAR ACTIVE
+=============================== */
 
 function updateSidebarActiveState(route) {
   const sidebarLinks = document.querySelectorAll('.sidebar__link');
@@ -58,52 +87,49 @@ function updateSidebarActiveState(route) {
 
     if (target === '#dashboard' && route === '/dashboard') {
       link.classList.add('active');
-      return;
     }
 
     if (target === '#documents' && route.startsWith('/documents') && route !== '/documents/new') {
       link.classList.add('active');
-      return;
     }
 
     if (target === '#documents/new' && route === '/documents/new') {
       link.classList.add('active');
-      return;
     }
 
     if (target === '#inventory' && (route === '/inventory' || route === '/inventory-balances')) {
       link.classList.add('active');
-      return;
     }
 
     if (target === '#inventory-balances' && route === '/inventory-balances') {
       link.classList.add('active');
-      return;
     }
 
     if (target === '#inventory-ledger' && route === '/inventory-ledger') {
       link.classList.add('active');
-      return;
     }
   });
 }
+
+/* ===============================
+   RUN ROUTE
+=============================== */
+
 export async function runCurrentRoute() {
-  const resolved = resolveRoute();
+  const resolved = matchRoute();
   const appRoot = document.querySelector('#app');
 
   updateSidebarActiveState(resolved.route || '');
 
   if (!resolved.handler) {
-    if (appRoot) {
-      appRoot.innerHTML = `
-        <section class="page-shell">
-          <div class="card">
-            <h2>Página não encontrada</h2>
-            <p>A rota solicitada não existe.</p>
-          </div>
-        </section>
-      `;
-    }
+    appRoot.innerHTML = `
+      <section class="page-shell">
+        <div class="card">
+          <h2>Página não encontrada</h2>
+          <p>A rota solicitada não existe.</p>
+        </div>
+      </section>
+    `;
     return;
   }
 
@@ -116,18 +142,20 @@ export async function runCurrentRoute() {
   } catch (error) {
     console.error('Erro ao renderizar rota:', error);
 
-    if (appRoot) {
-      appRoot.innerHTML = `
-        <section class="page-shell">
-          <div class="card">
-            <h2>Erro ao abrir a página</h2>
-            <p>${error?.message || 'Ocorreu um erro inesperado ao renderizar a rota.'}</p>
-          </div>
-        </section>
-      `;
-    }
+    appRoot.innerHTML = `
+      <section class="page-shell">
+        <div class="card">
+          <h2>Erro ao abrir a página</h2>
+          <p>${error?.message || 'Erro inesperado.'}</p>
+        </div>
+      </section>
+    `;
   }
 }
+
+/* ===============================
+   NAVIGATION
+=============================== */
 
 export async function navigateTo(hash) {
   if (window.location.hash === hash) {
