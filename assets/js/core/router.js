@@ -1,3 +1,5 @@
+// assets/js/core/router.js
+
 const routes = new Map();
 
 export function registerRoute(path, handler) {
@@ -10,9 +12,12 @@ export function getCurrentHash() {
 
 export function parseHash(hash = getCurrentHash()) {
   const cleanHash = hash.startsWith('#') ? hash.slice(1) : hash;
-  const [pathPart, queryString = ''] = cleanHash.split('?');
+  const [pathPart = '', queryString = ''] = cleanHash.split('?');
 
-  const normalizedPath = pathPart.startsWith('/') ? pathPart : `/${pathPart}`;
+  const normalizedPath = pathPart
+    ? (pathPart.startsWith('/') ? pathPart : `/${pathPart}`)
+    : '/';
+
   const segments = normalizedPath.split('/').filter(Boolean);
   const query = Object.fromEntries(new URLSearchParams(queryString).entries());
 
@@ -25,11 +30,11 @@ export function parseHash(hash = getCurrentHash()) {
 }
 
 /* ===============================
-   MATCH ROUTE (SUPORTA :id)
+   MATCH ROUTE
 =============================== */
 
-function matchRoute(path) {
-  const parsed = parseHash(path);
+function matchRoute(hash = getCurrentHash()) {
+  const parsed = parseHash(hash);
 
   for (const [routePath, handler] of routes.entries()) {
     const routeSegments = routePath.split('/').filter(Boolean);
@@ -37,28 +42,36 @@ function matchRoute(path) {
 
     if (routeSegments.length !== urlSegments.length) continue;
 
-    let params = {};
-    let match = true;
+    const pathParams = {};
+    let isMatch = true;
 
-    for (let i = 0; i < routeSegments.length; i++) {
-      const routeSeg = routeSegments[i];
-      const urlSeg = urlSegments[i];
+    for (let i = 0; i < routeSegments.length; i += 1) {
+      const routeSegment = routeSegments[i];
+      const urlSegment = urlSegments[i];
 
-      if (routeSeg.startsWith(':')) {
-        const key = routeSeg.replace(':', '');
-        params[key] = urlSeg;
-      } else if (routeSeg !== urlSeg) {
-        match = false;
+      if (routeSegment.startsWith(':')) {
+        pathParams[routeSegment.slice(1)] = urlSegment;
+        continue;
+      }
+
+      if (routeSegment !== urlSegment) {
+        isMatch = false;
         break;
       }
     }
 
-    if (match) {
+    if (isMatch) {
       return {
         handler,
         route: routePath,
-        params,
-        segments: urlSegments,
+        params: {
+          ...parsed.query,
+          ...pathParams,
+        },
+        pathParams,
+        query: parsed.query,
+        segments: parsed.segments,
+        fullPath: parsed.fullPath,
       };
     }
   }
@@ -66,8 +79,11 @@ function matchRoute(path) {
   return {
     handler: null,
     route: null,
-    params: {},
+    params: parsed.query,
+    pathParams: {},
+    query: parsed.query,
     segments: parsed.segments,
+    fullPath: parsed.fullPath,
   };
 }
 
@@ -75,7 +91,7 @@ function matchRoute(path) {
    SIDEBAR ACTIVE
 =============================== */
 
-function updateSidebarActiveState(route) {
+function updateSidebarActiveState(route = '') {
   const sidebarLinks = document.querySelectorAll('.sidebar__link');
   if (!sidebarLinks.length) return;
 
@@ -87,22 +103,27 @@ function updateSidebarActiveState(route) {
 
     if (target === '#dashboard' && route === '/dashboard') {
       link.classList.add('active');
+      return;
     }
 
     if (target === '#documents' && route.startsWith('/documents') && route !== '/documents/new') {
       link.classList.add('active');
+      return;
     }
 
     if (target === '#documents/new' && route === '/documents/new') {
       link.classList.add('active');
+      return;
     }
 
     if (target === '#inventory' && (route === '/inventory' || route === '/inventory-balances')) {
       link.classList.add('active');
+      return;
     }
 
     if (target === '#inventory-balances' && route === '/inventory-balances') {
       link.classList.add('active');
+      return;
     }
 
     if (target === '#inventory-ledger' && route === '/inventory-ledger') {
@@ -122,34 +143,41 @@ export async function runCurrentRoute() {
   updateSidebarActiveState(resolved.route || '');
 
   if (!resolved.handler) {
-    appRoot.innerHTML = `
-      <section class="page-shell">
-        <div class="card">
-          <h2>Página não encontrada</h2>
-          <p>A rota solicitada não existe.</p>
-        </div>
-      </section>
-    `;
+    if (appRoot) {
+      appRoot.innerHTML = `
+        <section class="page-shell">
+          <div class="card">
+            <h2>Página não encontrada</h2>
+            <p>A rota solicitada não existe.</p>
+          </div>
+        </section>
+      `;
+    }
     return;
   }
 
   try {
     await resolved.handler({
       route: resolved.route,
+      fullPath: resolved.fullPath,
       params: resolved.params,
+      pathParams: resolved.pathParams,
+      query: resolved.query,
       segments: resolved.segments,
     });
   } catch (error) {
     console.error('Erro ao renderizar rota:', error);
 
-    appRoot.innerHTML = `
-      <section class="page-shell">
-        <div class="card">
-          <h2>Erro ao abrir a página</h2>
-          <p>${error?.message || 'Erro inesperado.'}</p>
-        </div>
-      </section>
-    `;
+    if (appRoot) {
+      appRoot.innerHTML = `
+        <section class="page-shell">
+          <div class="card">
+            <h2>Erro ao abrir a página</h2>
+            <p>${error?.message || 'Erro inesperado.'}</p>
+          </div>
+        </section>
+      `;
+    }
   }
 }
 
