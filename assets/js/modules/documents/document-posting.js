@@ -5,19 +5,33 @@ import { showConfirm } from '../../ui/confirm.js';
 import { showToast } from '../../ui/toast.js';
 
 export async function handleDocumentPosting(documentId, options = {}) {
+  if (!documentId) return false;
+
   const { redirectTo = 'detail' } = options;
 
-  const confirmed = await showConfirm('Deseja postar este documento?');
-  if (!confirmed) return false;
+  const confirmed = await showConfirm(
+    'Tens certeza que desejas postar este documento? Esta acção irá gerar movimentos de stock.'
+  );
 
-  await postDocumentService(documentId);
-  showToast('Documento postado com sucesso.');
-
-  if (redirectTo === 'list') {
-    window.location.hash = '#documents';
-    return true;
+  if (!confirmed) {
+    return false;
   }
 
-  window.location.hash = `#documents/view?id=${documentId}`;
-  return true;
+  try {
+    postDocumentService(documentId);
+
+    showToast('Documento postado com sucesso.');
+
+    if (redirectTo === 'list') {
+      window.location.hash = '#documents';
+      return true;
+    }
+
+    window.location.hash = `#documents/view?id=${documentId}`;
+    return true;
+  } catch (error) {
+    console.error(error);
+    showToast(error?.message || 'Erro ao postar documento.');
+    return false;
+  }
 }
