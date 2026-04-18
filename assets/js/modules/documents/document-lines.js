@@ -32,7 +32,7 @@ function createLine(products = [], warehouses = [], line = {}) {
       line.unitPrice ?? line.unit_price ?? product?.unitPrice ?? product?.price ?? 0,
       0
     ),
-    total: toNumber(line.total, 0),
+    total: 0,
     productName: product?.name || '',
     warehouseName: warehouse?.name || '',
   };
@@ -43,7 +43,9 @@ function calculateLineTotal(line) {
 }
 
 function buildSummary(lines = []) {
-  const validLines = lines.filter((line) => line.product_id && toNumber(line.quantity, 0) > 0);
+  const validLines = lines.filter(
+    (line) => line.product_id && toNumber(line.quantity, 0) > 0
+  );
 
   return {
     linesCount: validLines.length,
@@ -143,7 +145,6 @@ function buildTable(lines = [], products = [], warehouses = []) {
             <th></th>
           </tr>
         </thead>
-
         <tbody id="document-lines-body">
           ${lines.map((line) => buildRow(line, products, warehouses)).join('')}
         </tbody>
@@ -161,24 +162,34 @@ export function initDocumentLines({
   onChange = () => {},
 } = {}) {
   const container = document.querySelector(containerSelector);
-  const addButton = document.querySelector(addButtonSelector);
 
   if (!container) {
     throw new Error('Container das linhas não encontrado.');
   }
 
-  let lines = Array.isArray(initialLines) && initialLines.length
-    ? initialLines.map((line) => createLine(products, warehouses, line))
-    : [createLine(products, warehouses, { quantity: 1, unitPrice: 0 })];
+  let lines =
+    Array.isArray(initialLines) && initialLines.length
+      ? initialLines.map((line) => createLine(products, warehouses, line))
+      : [createLine(products, warehouses, { quantity: 1, unitPrice: 0 })];
 
-  function render() {
-    container.innerHTML = buildTable(lines, products, warehouses);
-    emitChange();
+  let isBound = false;
+
+  function recalculateAll() {
+    lines = lines.map((line) => ({
+      ...line,
+      total: calculateLineTotal(line),
+    }));
   }
 
   function emitChange() {
-    const summary = buildSummary(lines);
-    onChange(summary);
+    recalculateAll();
+    onChange(buildSummary(lines));
+  }
+
+  function render() {
+    recalculateAll();
+    container.innerHTML = buildTable(lines, products, warehouses);
+    emitChange();
   }
 
   function syncRow(lineId, row) {
@@ -196,6 +207,11 @@ export function initDocumentLines({
       line.productName = selectedProduct.name || '';
     }
 
+    const selectedWarehouse = warehouses.find((item) => item.id === line.warehouse_id);
+    if (selectedWarehouse) {
+      line.warehouseName = selectedWarehouse.name || '';
+    }
+
     const totalCell = row.querySelector('.doc-line-total-cell');
     if (totalCell) {
       totalCell.textContent = formatMoney(line.total);
@@ -204,7 +220,9 @@ export function initDocumentLines({
     emitChange();
   }
 
-  function addLine() {
+  function addLine(event) {
+    if (event) event.preventDefault();
+
     lines.push(
       createLine(products, warehouses, {
         quantity: 1,
@@ -226,58 +244,69 @@ export function initDocumentLines({
     render();
   }
 
-  container.addEventListener('input', (event) => {
-    const row = event.target.closest('.document-line-row');
-    if (!row) return;
+  function bindEvents() {
+    if (isBound) return;
+    isBound = true;
 
-    const lineId = row.dataset.lineId;
-    syncRow(lineId, row);
-  });
+    document.addEventListener('click', (event) => {
+      const addButton = event.target.closest(addButtonSelector);
+      if (addButton) {
+        addLine(event);
+        return;
+      }
 
-  container.addEventListener('change', (event) => {
-    const row = event.target.closest('.document-line-row');
-    if (!row) return;
+      const removeButton = event.target.closest('.doc-line-remove');
+      if (removeButton && container.contains(removeButton)) {
+        event.preventDefault();
+        const row = removeButton.closest('.document-line-row');
+        if (!row) return;
+        removeLine(row.dataset.lineId);
+      }
+    });
 
-    const lineId = row.dataset.lineId;
+    container.addEventListener('input', (event) => {
+      const row = event.target.closest('.document-line-row');
+      if (!row) return;
 
-    if (event.target.classList.contains('doc-line-product')) {
+      syncRow(row.dataset.lineId, row);
+    });
+
+    container.addEventListener('change', (event) => {
+      const row = event.target.closest('.document-line-row');
+      if (!row) return;
+
+      const lineId = row.dataset.lineId;
       const line = lines.find((item) => item.id === lineId);
-      const selectedProduct = products.find((item) => item.id === event.target.value);
 
-      if (line && selectedProduct) {
-        const nextPrice = toNumber(
-          selectedProduct.unitPrice ?? selectedProduct.price ?? line.unitPrice,
-          line.unitPrice
-        );
+      if (event.target.classList.contains('doc-line-product')) {
+        const selectedProduct = products.find((item) => item.id === event.target.value);
 
-        line.unitPrice = nextPrice;
+        if (line && selectedProduct) {
+          const nextPrice = toNumber(
+            selectedProduct.unitPrice ?? selectedProduct.price ?? line.unitPrice,
+            line.unitPrice
+          );
 
-        const unitPriceInput = row.querySelector('.doc-line-unit-price');
-        if (unitPriceInput) {
-          unitPriceInput.value = String(nextPrice);
+          line.unitPrice = nextPrice;
+
+          const unitPriceInput = row.querySelector('.doc-line-unit-price');
+          if (unitPriceInput) {
+            unitPriceInput.value = String(nextPrice);
+          }
         }
       }
-    }
 
-    syncRow(lineId, row);
-  });
+      syncRow(lineId, row);
+    });
+  }
 
-  container.addEventListener('click', (event) => {
-    const removeButton = event.target.closest('.doc-line-remove');
-    if (!removeButton) return;
-
-    const row = removeButton.closest('.document-line-row');
-    if (!row) return;
-
-    removeLine(row.dataset.lineId);
-  });
-
-  addButton?.addEventListener('click', addLine);
-
+  bindEvents();
   render();
 
   return {
     getLines() {
+      recalculateAll();
+
       return lines.map((line) => ({
         id: line.id,
         product_id: line.product_id,
@@ -289,17 +318,21 @@ export function initDocumentLines({
     },
 
     getSummary() {
+      recalculateAll();
       return buildSummary(lines);
     },
 
     setLines(nextLines = []) {
-      lines = Array.isArray(nextLines) && nextLines.length
-        ? nextLines.map((line) => createLine(products, warehouses, line))
-        : [createLine(products, warehouses, { quantity: 1, unitPrice: 0 })];
+      lines =
+        Array.isArray(nextLines) && nextLines.length
+          ? nextLines.map((line) => createLine(products, warehouses, line))
+          : [createLine(products, warehouses, { quantity: 1, unitPrice: 0 })];
 
       render();
     },
 
-    addLine,
+    addLine() {
+      addLine();
+    },
   };
 }
