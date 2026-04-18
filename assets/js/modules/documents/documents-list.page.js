@@ -1,4 +1,4 @@
-import { getDocumentsList } from './documents.service.js';
+import { listDocuments } from './documents.service.js';
 import { handleDocumentPosting } from './document-posting.js';
 import { handleDocumentCancel } from './document-cancel.js';
 
@@ -8,15 +8,31 @@ export async function renderDocumentsListPage() {
   const appRoot = document.querySelector('#app');
   const filters = getCurrentListFilters();
 
-  const result = getDocumentsList({
+const result = listDocuments({
+  filters: {
     query: filters.query,
     status: filters.status,
-    sortBy: filters.sortBy,
+  },
+  sort: {
+    field: 'date',
+    direction: filters.sortBy === 'dateAsc' ? 'asc' : 'desc',
+  },
+  pagination: {
     page: filters.page,
     pageSize: DEFAULT_PAGE_SIZE,
-  });
+  },
+});
 
-  const { items, summaries, pagination } = result;
+const { data, meta, summary } = result;
+
+const items = data;
+const summaries = summary;
+const pagination = {
+  page: meta.page,
+  totalPages: meta.totalPages,
+  hasPrev: meta.page > 1,
+  hasNext: meta.page < meta.totalPages,
+};
 
   appRoot.innerHTML = `
     <section class="page-shell documents-page">
