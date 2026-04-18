@@ -1,64 +1,110 @@
+
+
+let modalRoot = null;
+
+function ensureModalRoot() {
+  if (modalRoot) return modalRoot;
+
+  modalRoot = document.createElement('div');
+  modalRoot.id = 'app-modal-root';
+  document.body.appendChild(modalRoot);
+
+  return modalRoot;
+}
+
 export function showInputModal({
-  title = 'Motivo',
-  label = 'Motivo',
+  title = 'Input',
+  label = 'Valor',
   placeholder = '',
   confirmText = 'Confirmar',
   cancelText = 'Cancelar',
+  required = false,
+  minLength = 0,
 } = {}) {
   return new Promise((resolve) => {
-    const overlay = window.document.createElement('div');
-    overlay.className = 'ui-modal-overlay';
+    const root = ensureModalRoot();
 
-    overlay.innerHTML = `
-      <div class="ui-modal">
-        <div class="ui-modal-header">
-          <h3>${title}</h3>
-        </div>
+    root.innerHTML = `
+      <div class="modal-overlay">
+        <div class="modal-card">
+          <div class="modal-header">
+            <h3>${escapeHtml(title)}</h3>
+          </div>
 
-        <div class="ui-modal-body">
-          <label class="ui-label">${label}</label>
-          <input type="text" class="ui-input" placeholder="${placeholder}" />
-        </div>
+          <div class="modal-body">
+            <label class="modal-label">${escapeHtml(label)}</label>
+            <input
+              type="text"
+              class="modal-input"
+              placeholder="${escapeHtml(placeholder)}"
+              id="modal-input-field"
+            />
+            <span class="modal-error" id="modal-error" style="display:none;"></span>
+          </div>
 
-        <div class="ui-modal-actions">
-          <button class="btn btn-secondary" data-action="cancel">
-            ${cancelText}
-          </button>
-          <button class="btn btn-primary" data-action="confirm">
-            ${confirmText}
-          </button>
+          <div class="modal-actions">
+            <button class="btn btn-secondary" id="modal-cancel">
+              ${escapeHtml(cancelText)}
+            </button>
+            <button class="btn btn-danger" id="modal-confirm">
+              ${escapeHtml(confirmText)}
+            </button>
+          </div>
         </div>
       </div>
     `;
 
-    const input = overlay.querySelector('input');
+    const input = document.getElementById('modal-input-field');
+    const errorEl = document.getElementById('modal-error');
+    const cancelBtn = document.getElementById('modal-cancel');
+    const confirmBtn = document.getElementById('modal-confirm');
+
+    input.focus();
 
     function close(value) {
-      overlay.remove();
+      root.innerHTML = '';
       resolve(value);
     }
 
-overlay.addEventListener('click', (event) => {
-  const btn = event.target.closest('[data-action]');
+    cancelBtn.onclick = () => close(null);
 
-  // 👉 clicar fora do modal fecha
-  if (!btn) {
-    if (event.target === overlay) {
-      close(null);
+    confirmBtn.onclick = () => {
+      const value = input.value.trim();
+
+      if (required && !value) {
+        showError('Campo obrigatório.');
+        return;
+      }
+
+      if (minLength && value.length < minLength) {
+        showError(`Mínimo de ${minLength} caracteres.`);
+        return;
+      }
+
+      close(value);
+    };
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        confirmBtn.click();
+      }
+      if (e.key === 'Escape') {
+        cancelBtn.click();
+      }
+    });
+
+    function showError(message) {
+      errorEl.textContent = message;
+      errorEl.style.display = 'block';
     }
-    return;
-  }
-
-  if (btn.dataset.action === 'confirm') {
-  close(input.value || '');
-    return;
-  }
-
-  close(null);
-});
-
-    window.document.body.appendChild(overlay);
-
-    input.focus();
   });
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
