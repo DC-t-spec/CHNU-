@@ -4,6 +4,10 @@ import { renderDocumentsListPage } from './modules/documents/documents-list.page
 import { renderDocumentFormPage } from './modules/documents/document-form.page.js';
 import { renderDocumentDetailPage } from './modules/documents/document-detail.page.js';
 
+import { renderInventoryPage } from './modules/inventory/inventory.page.js';
+import { renderInventoryBalancesPage } from './modules/inventory/inventory-balances.page.js';
+import { renderInventoryLedgerPage } from './modules/inventory/inventory-ledger.page.js';
+
 function renderDashboardPage() {
   const app = document.querySelector('#app');
   if (!app) return;
@@ -32,10 +36,16 @@ function renderNotFoundPage() {
 
   app.innerHTML = `
     <section class="page-shell">
-      <div class="empty-state">
-        <div class="empty-state__icon">404</div>
-        <h3>Página não encontrada</h3>
-        <p>A rota que tentaste abrir não existe.</p>
+      <div class="card">
+        <div class="card-header">
+          <h3>Página não encontrada</h3>
+        </div>
+        <div class="card-body" style="display:grid;gap:12px;">
+          <p>A rota que tentaste abrir não existe.</p>
+          <div>
+            <a class="btn btn-secondary" href="#dashboard">Ir para dashboard</a>
+          </div>
+        </div>
       </div>
     </section>
   `;
@@ -47,6 +57,10 @@ registerRoute('/documents', renderDocumentsListPage);
 registerRoute('/documents/new', renderDocumentFormPage);
 registerRoute('/documents/view', renderDocumentDetailPage);
 registerRoute('/documents/edit', renderDocumentFormPage);
+
+registerRoute('/inventory', renderInventoryPage);
+registerRoute('/inventory-balances', renderInventoryBalancesPage);
+registerRoute('/inventory-ledger', renderInventoryLedgerPage);
 
 startRouter({
   notFound: renderNotFoundPage,
