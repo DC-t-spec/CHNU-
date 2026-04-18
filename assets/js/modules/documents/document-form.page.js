@@ -1,305 +1,226 @@
-// assets/js/modules/documents/document-form.page.js
-
+import { parseHash } from '../../core/router.js';
 import {
-  getDocumentService,
-  saveDocumentService,
-  getProductsService,
-  getWarehousesService,
+  getDocumentById,
+  saveDocument,
 } from '../../services/documents.service.js';
+import {
+  renderDocumentLines,
+  getDocumentLines,
+  computeDocumentTotals,
+} from './document-lines.js';
 import { showToast } from '../../ui/toast.js';
-import { assertEditable } from '../../services/document-status.service.js';
-import { initDocumentLines } from './document-lines.js';
 
-export async function renderDocumentFormPage(context = {}) {
-  const appRoot = document.querySelector('#app');
-  const documentId = context?.params?.id || context?.query?.id || null;
+function getPageState() {
+  const { fullPath, query } = parseHash();
+  const isEdit = fullPath === '/documents/edit';
+  const documentId = query.id || '';
 
-  const products = getProductsService();
-  const warehouses = getWarehousesService();
-  const existing = documentId ? getDocumentService(documentId) : null;
+  return {
+    isEdit,
+    documentId,
+  };
+}
 
-  if (documentId && !existing) {
-    appRoot.innerHTML = `
+function getFormValues(form, lines) {
+  const formData = new FormData(form);
+
+  return {
+    id: form.dataset.documentId || '',
+    status: form.dataset.documentStatus || 'draft',
+    number: formData.get('number')?.toString().trim() ?? '',
+    type: formData.get('type')?.toString().trim() ?? 'transfer',
+    date: formData.get('date')?.toString().trim() ?? '',
+    reference: formData.get('reference')?.toString().trim() ?? '',
+    origin: formData.get('origin')?.toString().trim() ?? '',
+    destination: formData.get('destination')?.toString().trim() ?? '',
+    notes: formData.get('notes')?.toString().trim() ?? '',
+    lines,
+  };
+}
+
+function validateDocument(values) {
+  if (!values.date) {
+    throw new Error('Preenche a data do documento.');
+  }
+
+  if (!values.type) {
+    throw new Error('Escolhe o tipo de documento.');
+  }
+
+  if (!values.lines.length) {
+    throw new Error('Adiciona pelo menos uma linha.');
+  }
+}
+
+export async function renderDocumentFormPage() {
+  const app = document.querySelector('#app');
+  if (!app) return;
+
+  const { isEdit, documentId } = getPageState();
+  const documentData = isEdit ? getDocumentById(documentId) : null;
+
+  if (isEdit && !documentData) {
+    app.innerHTML = `
       <section class="page-shell">
-        <div class="card">
-          <h2>Documento não encontrado</h2>
-          <p>O documento solicitado não existe.</p>
-          <a href="#documents" class="btn btn-primary">Voltar</a>
+        <div class="empty-state">
+          <div class="empty-state__icon">📄</div>
+          <h3>Documento não encontrado</h3>
+          <p>Não foi possível carregar o documento para edição.</p>
         </div>
       </section>
     `;
     return;
   }
 
-  if (documentId && existing) {
-    try {
-      assertEditable(documentId);
-    } catch (error) {
-      appRoot.innerHTML = `
-        <section class="page-shell">
+  const readOnly = isEdit && ['posted', 'cancelled'].includes(documentData.status);
+  const title = isEdit ? 'Editar documento' : 'Novo documento';
+
+  app.innerHTML = `
+    <section class="page-shell">
+      <div class="page-header" style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start;">
+        <div>
+          <h1>${title}</h1>
+          <p>${isEdit ? 'Actualiza o rascunho do documento.' : 'Criação de novo documento.'}</p>
+        </div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <a class="btn btn-ghost" href="#documents">Voltar</a>
+          ${
+            isEdit
+              ? `<a class="btn btn-secondary" href="#documents/view?id=${documentData.id}">Ver documento</a>`
+              : ''
+          }
+        </div>
+      </div>
+
+      <form id="document-form" class="document-form" data-document-id="${documentData?.id ?? ''}" data-document-status="${documentData?.status ?? 'draft'}">
+        <div class="grid grid-2" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;">
           <div class="card">
-            <h2>Edição bloqueada</h2>
-            <p>${escapeHtml(error.message)}</p>
-            <div class="page-actions">
-              <a href="#documents" class="btn btn-secondary">Voltar</a>
-              <a href="#documents/view?id=${existing.id}" class="btn btn-primary">Ver documento</a>
+            <div class="card-header">
+              <h3>Dados principais</h3>
+            </div>
+
+            <div class="form-grid" style="display:grid;gap:12px;">
+              <label class="form-field">
+                <span>Número</span>
+                <input type="text" name="number" value="${documentData?.number ?? ''}" ${readOnly ? 'disabled' : ''} />
+              </label>
+
+              <label class="form-field">
+                <span>Tipo</span>
+                <select name="type" ${readOnly ? 'disabled' : ''}>
+                  <option value="transfer" ${documentData?.type === 'transfer' ? 'selected' : ''}>Transferência</option>
+                  <option value="purchase" ${documentData?.type === 'purchase' ? 'selected' : ''}>Compra</option>
+                  <option value="sale" ${documentData?.type === 'sale' ? 'selected' : ''}>Venda</option>
+                  <option value="adjustment" ${documentData?.type === 'adjustment' ? 'selected' : ''}>Ajuste</option>
+                  <option value="return" ${documentData?.type === 'return' ? 'selected' : ''}>Devolução</option>
+                </select>
+              </label>
+
+              <label class="form-field">
+                <span>Data</span>
+                <input type="date" name="date" value="${documentData?.date ?? new Date().toISOString().slice(0, 10)}" ${readOnly ? 'disabled' : ''} />
+              </label>
+
+              <label class="form-field">
+                <span>Referência</span>
+                <input type="text" name="reference" value="${documentData?.reference ?? ''}" ${readOnly ? 'disabled' : ''} />
+              </label>
             </div>
           </div>
-        </section>
-      `;
-      return;
-    }
-  }
 
-  const initialLines = existing?.lines?.length
-    ? existing.lines.map((line) => ({
-        id: line.id || crypto.randomUUID(),
-        product_id: line.product_id || '',
-        warehouse_id: '',
-        quantity: Number(line.quantity || 0),
-        unitPrice: Number(line.unitPrice || 0),
-        total: Number(line.total || 0),
-      }))
-    : [
-        {
-          id: crypto.randomUUID(),
-          product_id: '',
-          warehouse_id: '',
-          quantity: 1,
-          unitPrice: 0,
-          total: 0,
-        },
-      ];
+          <div class="card">
+            <div class="card-header">
+              <h3>Origem e destino</h3>
+            </div>
 
-  appRoot.innerHTML = `
-    <section class="page-shell documents-form-page">
-      <div class="page-header">
-        <div>
-          <h1>${documentId ? 'Editar Documento' : 'Novo Documento'}</h1>
-          <p>Preenchimento operacional com validação e integração ao stock.</p>
-        </div>
+            <div class="form-grid" style="display:grid;gap:12px;">
+              <label class="form-field">
+                <span>Origem</span>
+                <input type="text" name="origin" value="${documentData?.origin ?? ''}" ${readOnly ? 'disabled' : ''} />
+              </label>
 
-        <div class="page-actions">
-          <a href="#documents" class="btn btn-secondary">Voltar</a>
-          <button type="button" class="btn btn-primary" id="save-document-btn">Guardar</button>
-        </div>
-      </div>
+              <label class="form-field">
+                <span>Destino</span>
+                <input type="text" name="destination" value="${documentData?.destination ?? ''}" ${readOnly ? 'disabled' : ''} />
+              </label>
 
-      <div class="card">
-        <div class="document-form-grid">
-          <div class="form-group">
-            <label for="doc-date">Data</label>
-            <input type="date" id="doc-date" class="toolbar__input" value="${escapeHtml(existing?.date || getTodayDate())}" />
-          </div>
-
-          <div class="form-group">
-            <label for="doc-type">Tipo</label>
-            <select id="doc-type" class="toolbar__select">
-              <option value="Transferência">Transferência</option>
-              <option value="Ajuste">Ajuste</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="doc-origin">Origem</label>
-            <select id="doc-origin" class="toolbar__select">
-              <option value="">Selecionar</option>
-              ${warehouses
-                .map(
-                  (warehouse) => `
-                    <option value="${escapeHtml(warehouse.id)}">
-                      ${escapeHtml(warehouse.name)}
-                    </option>
-                  `
-                )
-                .join('')}
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="doc-destination">Destino</label>
-            <select id="doc-destination" class="toolbar__select">
-              <option value="">Selecionar</option>
-              ${warehouses
-                .map(
-                  (warehouse) => `
-                    <option value="${escapeHtml(warehouse.id)}">
-                      ${escapeHtml(warehouse.name)}
-                    </option>
-                  `
-                )
-                .join('')}
-            </select>
+              <label class="form-field">
+                <span>Observações</span>
+                <textarea name="notes" rows="6" ${readOnly ? 'disabled' : ''}>${documentData?.notes ?? ''}</textarea>
+              </label>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="card">
-        <div class="document-form__section-header">
-          <h3>Linhas</h3>
-          <button type="button" class="btn btn-secondary" id="add-line-btn">+ Linha</button>
-        </div>
+        <div id="document-lines-root" style="margin-top:16px;"></div>
 
-        <div id="document-lines"></div>
-      </div>
+        <div class="card" style="margin-top:16px;">
+          <div class="card-body" style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;">
+            <div id="document-form-totals" style="font-weight:600;">Linhas: 0 | Total: 0.00</div>
 
-      <div class="card">
-        <div class="document-totals-card">
-          <div class="document-total-item">
-            <span>Linhas</span>
-            <strong id="doc-lines-count">0</strong>
-          </div>
-
-          <div class="document-total-item">
-            <span>Total</span>
-            <strong id="doc-total">0.00</strong>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <a class="btn btn-ghost" href="#documents">Cancelar</a>
+              ${
+                readOnly
+                  ? ''
+                  : `<button type="submit" class="btn btn-primary">${isEdit ? 'Actualizar rascunho' : 'Guardar rascunho'}</button>`
+              }
+            </div>
           </div>
         </div>
-      </div>
+      </form>
     </section>
   `;
 
-  applyInitialHeaderValues();
-  syncTypeRules();
+  const form = document.querySelector('#document-form');
+  const linesRoot = document.querySelector('#document-lines-root');
+  const totalsEl = document.querySelector('#document-form-totals');
 
-  const linesController = initDocumentLines({
-    containerSelector: '#document-lines',
-    addButtonSelector: '#add-line-btn',
-    products,
-    warehouses,
-    initialLines,
-    onChange: handleLinesChange,
+  renderDocumentLines(linesRoot, documentData?.lines ?? []);
+
+  function refreshTotals() {
+    const lines = getDocumentLines(linesRoot);
+    const totals = computeDocumentTotals(lines);
+    totalsEl.textContent = `Linhas: ${totals.linesCount} | Total: ${totals.grandTotal.toFixed(2)}`;
+  }
+
+  linesRoot.addEventListener('input', refreshTotals);
+  linesRoot.addEventListener('click', () => {
+    setTimeout(refreshTotals, 0);
   });
 
-  document.getElementById('doc-type').addEventListener('change', syncTypeRules);
-  document.getElementById('save-document-btn').addEventListener('click', handleSave);
+  refreshTotals();
 
-  function applyInitialHeaderValues() {
-    const typeSelect = document.getElementById('doc-type');
-    const originSelect = document.getElementById('doc-origin');
-    const destinationSelect = document.getElementById('doc-destination');
+  if (readOnly) return;
 
-    if (existing?.type) {
-      typeSelect.value = existing.type;
-    }
-
-    if (existing?.origin) {
-      const originWarehouse = warehouses.find((warehouse) => warehouse.name === existing.origin);
-      if (originWarehouse) {
-        originSelect.value = originWarehouse.id;
-      }
-    }
-
-    if (existing?.destination) {
-      const destinationWarehouse = warehouses.find((warehouse) => warehouse.name === existing.destination);
-      if (destinationWarehouse) {
-        destinationSelect.value = destinationWarehouse.id;
-      }
-    }
-  }
-
-  function syncTypeRules() {
-    const type = document.getElementById('doc-type').value;
-    const originSelect = document.getElementById('doc-origin');
-
-    if (type === 'Ajuste') {
-      originSelect.value = '';
-      originSelect.disabled = true;
-      return;
-    }
-
-    originSelect.disabled = false;
-  }
-
-  function handleLinesChange(summary) {
-    document.getElementById('doc-lines-count').textContent = String(summary.linesCount || 0);
-    document.getElementById('doc-total').textContent = formatCurrency(summary.grandTotal || 0);
-  }
-
-  function handleSave() {
-    const payload = {
-      id: documentId,
-      date: document.getElementById('doc-date').value,
-      type: document.getElementById('doc-type').value,
-      origin: document.getElementById('doc-origin').value,
-      destination: document.getElementById('doc-destination').value,
-      lines: linesController
-        .getLines()
-        .map((line) => ({
-          product_id: line.product_id || '',
-          quantity: Number(line.quantity || 0),
-          unitPrice: Number(line.unitPrice || 0),
-        })),
-    };
-
-    const validationError = validateBeforeSave(payload);
-
-    if (validationError) {
-      showToast(validationError, 'error');
-      return;
-    }
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
 
     try {
-      const saved = saveDocumentService(payload);
-      showToast('Documento guardado com sucesso.', 'success');
-      window.location.hash = `#documents/view?id=${saved.id}`;
+      const lines = getDocumentLines(linesRoot);
+      const values = getFormValues(form, lines);
+
+      validateDocument(values);
+
+      const saved = await saveDocument(values);
+
+      showToast({
+        type: 'success',
+        message: isEdit ? 'Documento actualizado com sucesso.' : 'Documento criado com sucesso.',
+      });
+
+      const nextId = saved?.id || values.id;
+      if (nextId) {
+        window.location.hash = `#documents/view?id=${nextId}`;
+      } else {
+        window.location.hash = '#documents';
+      }
     } catch (error) {
-      console.error(error);
-      showToast(error?.message || 'Erro ao guardar documento.', 'error');
+      showToast({
+        type: 'error',
+        message: error?.message || 'Falha ao guardar documento.',
+      });
     }
-  }
-}
-
-function validateBeforeSave(data) {
-  if (!data.date) return 'Data obrigatória.';
-  if (!data.type) return 'Tipo obrigatório.';
-
-  if (data.type === 'Transferência') {
-    if (!data.origin) return 'Origem obrigatória.';
-    if (!data.destination) return 'Destino obrigatório.';
-    if (data.origin === data.destination) return 'Origem e destino não podem ser iguais.';
-  }
-
-  if (data.type === 'Ajuste') {
-    if (!data.destination) return 'Destino obrigatório.';
-  }
-
-  if (!Array.isArray(data.lines) || !data.lines.length) {
-    return 'Adicione pelo menos uma linha.';
-  }
-
-  for (let index = 0; index < data.lines.length; index += 1) {
-    const line = data.lines[index];
-
-    if (!line.product_id) return `Linha ${index + 1}: selecione produto.`;
-    if (!Number.isFinite(line.quantity) || line.quantity <= 0) return `Linha ${index + 1}: quantidade inválida.`;
-    if (!Number.isFinite(line.unitPrice) || line.unitPrice < 0) return `Linha ${index + 1}: preço inválido.`;
-  }
-
-  return null;
-}
-
-function getTodayDate() {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-
-  return `${year}-${month}-${day}`;
-}
-
-function formatCurrency(value) {
-  return Number(value || 0).toLocaleString('pt-PT', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
   });
-}
-
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
 }
