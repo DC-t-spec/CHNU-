@@ -1,235 +1,305 @@
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 function toNumber(value, fallback = 0) {
   const num = Number(value);
   return Number.isFinite(num) ? num : fallback;
 }
 
-function escapeHtml(value = '') {
-  return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
+function formatMoney(value) {
+  return Number(value || 0).toLocaleString('pt-PT', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
-export function createEmptyLine() {
+function createLine(products = [], warehouses = [], line = {}) {
+  const product = products.find((item) => item.id === line.product_id) || null;
+  const warehouse = warehouses.find((item) => item.id === line.warehouse_id) || null;
+
   return {
-    itemCode: '',
-    itemName: '',
-    description: '',
-    quantity: 1,
-    unit: 'un',
-    unitPrice: 0,
-    total: 0,
+    id: line.id || crypto.randomUUID(),
+    product_id: line.product_id || '',
+    warehouse_id: line.warehouse_id || '',
+    quantity: toNumber(line.quantity, 1),
+    unitPrice: toNumber(
+      line.unitPrice ?? line.unit_price ?? product?.unitPrice ?? product?.price ?? 0,
+      0
+    ),
+    total: toNumber(line.total, 0),
+    productName: product?.name || '',
+    warehouseName: warehouse?.name || '',
   };
 }
 
-export function normalizeLine(line = {}) {
-  const quantity = toNumber(line.quantity, 0);
-  const unitPrice = toNumber(line.unitPrice, 0);
+function calculateLineTotal(line) {
+  return toNumber(line.quantity, 0) * toNumber(line.unitPrice, 0);
+}
+
+function buildSummary(lines = []) {
+  const validLines = lines.filter((line) => line.product_id && toNumber(line.quantity, 0) > 0);
 
   return {
-    itemCode: line.itemCode ?? '',
-    itemName: line.itemName ?? '',
-    description: line.description ?? '',
-    quantity,
-    unit: line.unit ?? 'un',
-    unitPrice,
-    total: quantity * unitPrice,
+    linesCount: validLines.length,
+    grandTotal: validLines.reduce((sum, line) => sum + calculateLineTotal(line), 0),
   };
 }
 
-export function normalizeLines(lines = []) {
-  return (Array.isArray(lines) ? lines : [])
-    .map(normalizeLine)
-    .filter((line) => line.itemName || line.description || line.quantity > 0 || line.unitPrice > 0);
+function buildProductOptions(products = [], selectedId = '') {
+  return `
+    <option value="">Selecionar</option>
+    ${products
+      .map(
+        (product) => `
+          <option value="${escapeHtml(product.id)}" ${product.id === selectedId ? 'selected' : ''}>
+            ${escapeHtml(product.name || product.code || product.id)}
+          </option>
+        `
+      )
+      .join('')}
+  `;
 }
 
-export function computeDocumentTotals(lines = []) {
-  const normalized = normalizeLines(lines);
-
-  return {
-    linesCount: normalized.length,
-    grandTotal: normalized.reduce((sum, line) => sum + line.total, 0),
-  };
+function buildWarehouseOptions(warehouses = [], selectedId = '') {
+  return `
+    <option value="">Selecionar</option>
+    ${warehouses
+      .map(
+        (warehouse) => `
+          <option value="${escapeHtml(warehouse.id)}" ${warehouse.id === selectedId ? 'selected' : ''}>
+            ${escapeHtml(warehouse.name || warehouse.code || warehouse.id)}
+          </option>
+        `
+      )
+      .join('')}
+  `;
 }
 
-function createLineRowHtml(line = {}) {
-  const normalized = normalizeLine(line);
+function buildRow(line, products = [], warehouses = []) {
+  const total = calculateLineTotal(line);
 
   return `
-    <tr class="document-line-row">
+    <tr class="document-line-row" data-line-id="${escapeHtml(line.id)}">
       <td>
-        <input type="text" name="itemCode" value="${escapeHtml(normalized.itemCode)}" placeholder="Código" />
+        <select class="toolbar__select doc-line-product">
+          ${buildProductOptions(products, line.product_id)}
+        </select>
       </td>
+
       <td>
-        <input type="text" name="itemName" value="${escapeHtml(normalized.itemName)}" placeholder="Item" />
+        <select class="toolbar__select doc-line-warehouse">
+          ${buildWarehouseOptions(warehouses, line.warehouse_id)}
+        </select>
       </td>
+
       <td>
-        <input type="text" name="description" value="${escapeHtml(normalized.description)}" placeholder="Descrição" />
+        <input
+          type="number"
+          min="0.01"
+          step="0.01"
+          class="toolbar__input doc-line-quantity"
+          value="${toNumber(line.quantity, 1)}"
+        />
       </td>
+
       <td>
-        <input type="number" name="quantity" min="0" step="0.01" value="${normalized.quantity}" />
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          class="toolbar__input doc-line-unit-price"
+          value="${toNumber(line.unitPrice, 0)}"
+        />
       </td>
+
+      <td class="doc-line-total-cell">${formatMoney(total)}</td>
+
       <td>
-        <input type="text" name="unit" value="${escapeHtml(normalized.unit)}" placeholder="Un" />
-      </td>
-      <td>
-        <input type="number" name="unitPrice" min="0" step="0.01" value="${normalized.unitPrice}" />
-      </td>
-      <td>
-        <div class="line-total js-line-total">${normalized.total.toFixed(2)}</div>
-      </td>
-      <td>
-        <button type="button" class="btn btn-ghost btn-sm js-remove-line">Remover</button>
+        <button type="button" class="btn btn-danger btn-sm doc-line-remove">
+          Remover
+        </button>
       </td>
     </tr>
   `;
 }
 
-export function renderDocumentLines(target, lines = []) {
-  const container =
-    typeof target === 'string' ? document.querySelector(target) : target;
+function buildTable(lines = [], products = [], warehouses = []) {
+  return `
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Produto</th>
+            <th>Armazém</th>
+            <th>Qtd</th>
+            <th>Preço Unit.</th>
+            <th>Total</th>
+            <th></th>
+          </tr>
+        </thead>
 
-  if (!container) return;
-
-  const safeLines = Array.isArray(lines) && lines.length ? lines : [createEmptyLine()];
-
-  container.innerHTML = `
-    <div class="card">
-      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
-        <div>
-          <h3>Linhas do documento</h3>
-          <p>Itens, quantidades e valores.</p>
-        </div>
-        <button type="button" class="btn btn-secondary js-add-line">Adicionar linha</button>
-      </div>
-
-      <div class="table-responsive">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Código</th>
-              <th>Item</th>
-              <th>Descrição</th>
-              <th>Qtd</th>
-              <th>Un</th>
-              <th>Preço Unit.</th>
-              <th>Total</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody class="js-document-lines-body">
-            ${safeLines.map(createLineRowHtml).join('')}
-          </tbody>
-        </table>
-      </div>
-
-      <div class="document-lines-summary" style="display:flex;justify-content:flex-end;gap:24px;margin-top:16px;">
-        <div><strong>Linhas:</strong> <span class="js-lines-count">0</span></div>
-        <div><strong>Total:</strong> <span class="js-grand-total">0.00</span></div>
-      </div>
+        <tbody id="document-lines-body">
+          ${lines.map((line) => buildRow(line, products, warehouses)).join('')}
+        </tbody>
+      </table>
     </div>
   `;
-
-  bindDocumentLines(container);
-  updateDocumentLinesSummary(container);
 }
 
-export function bindDocumentLines(target) {
-  const container =
-    typeof target === 'string' ? document.querySelector(target) : target;
+export function initDocumentLines({
+  containerSelector,
+  addButtonSelector,
+  products = [],
+  warehouses = [],
+  initialLines = [],
+  onChange = () => {},
+} = {}) {
+  const container = document.querySelector(containerSelector);
+  const addButton = document.querySelector(addButtonSelector);
 
-  if (!container) return;
+  if (!container) {
+    throw new Error('Container das linhas não encontrado.');
+  }
 
-  const body = container.querySelector('.js-document-lines-body');
-  const addBtn = container.querySelector('.js-add-line');
+  let lines = Array.isArray(initialLines) && initialLines.length
+    ? initialLines.map((line) => createLine(products, warehouses, line))
+    : [createLine(products, warehouses, { quantity: 1, unitPrice: 0 })];
 
-  if (!body || !addBtn) return;
+  function render() {
+    container.innerHTML = buildTable(lines, products, warehouses);
+    emitChange();
+  }
 
-  addBtn.addEventListener('click', () => {
-    body.insertAdjacentHTML('beforeend', createLineRowHtml(createEmptyLine()));
-    updateDocumentLinesSummary(container);
-  });
+  function emitChange() {
+    const summary = buildSummary(lines);
+    onChange(summary);
+  }
 
-  body.addEventListener('click', (event) => {
-    const removeBtn = event.target.closest('.js-remove-line');
-    if (!removeBtn) return;
+  function syncRow(lineId, row) {
+    const line = lines.find((item) => item.id === lineId);
+    if (!line || !row) return;
 
-    const rows = body.querySelectorAll('.document-line-row');
-    if (rows.length <= 1) {
-      const onlyRow = rows[0];
-      if (!onlyRow) return;
+    line.product_id = row.querySelector('.doc-line-product')?.value || '';
+    line.warehouse_id = row.querySelector('.doc-line-warehouse')?.value || '';
+    line.quantity = toNumber(row.querySelector('.doc-line-quantity')?.value, 0);
+    line.unitPrice = toNumber(row.querySelector('.doc-line-unit-price')?.value, 0);
+    line.total = calculateLineTotal(line);
 
-      onlyRow.querySelectorAll('input').forEach((input) => {
-        if (input.name === 'quantity') input.value = '1';
-        else if (input.name === 'unit') input.value = 'un';
-        else if (input.name === 'unitPrice') input.value = '0';
-        else input.value = '';
-      });
+    const selectedProduct = products.find((item) => item.id === line.product_id);
+    if (selectedProduct) {
+      line.productName = selectedProduct.name || '';
+    }
 
-      const totalEl = onlyRow.querySelector('.js-line-total');
-      if (totalEl) totalEl.textContent = '0.00';
+    const totalCell = row.querySelector('.doc-line-total-cell');
+    if (totalCell) {
+      totalCell.textContent = formatMoney(line.total);
+    }
 
-      updateDocumentLinesSummary(container);
+    emitChange();
+  }
+
+  function addLine() {
+    lines.push(
+      createLine(products, warehouses, {
+        quantity: 1,
+        unitPrice: 0,
+      })
+    );
+
+    render();
+  }
+
+  function removeLine(lineId) {
+    if (lines.length === 1) {
+      lines = [createLine(products, warehouses, { quantity: 1, unitPrice: 0 })];
+      render();
       return;
     }
 
-    removeBtn.closest('.document-line-row')?.remove();
-    updateDocumentLinesSummary(container);
-  });
+    lines = lines.filter((line) => line.id !== lineId);
+    render();
+  }
 
-  body.addEventListener('input', (event) => {
+  container.addEventListener('input', (event) => {
     const row = event.target.closest('.document-line-row');
     if (!row) return;
 
-    updateLineTotal(row);
-    updateDocumentLinesSummary(container);
+    const lineId = row.dataset.lineId;
+    syncRow(lineId, row);
   });
-}
 
-export function updateLineTotal(row) {
-  const quantity = toNumber(row.querySelector('[name="quantity"]')?.value, 0);
-  const unitPrice = toNumber(row.querySelector('[name="unitPrice"]')?.value, 0);
-  const total = quantity * unitPrice;
+  container.addEventListener('change', (event) => {
+    const row = event.target.closest('.document-line-row');
+    if (!row) return;
 
-  const totalEl = row.querySelector('.js-line-total');
-  if (totalEl) totalEl.textContent = total.toFixed(2);
-}
+    const lineId = row.dataset.lineId;
 
-export function getDocumentLines(target) {
-  const container =
-    typeof target === 'string' ? document.querySelector(target) : target;
+    if (event.target.classList.contains('doc-line-product')) {
+      const line = lines.find((item) => item.id === lineId);
+      const selectedProduct = products.find((item) => item.id === event.target.value);
 
-  if (!container) return [];
+      if (line && selectedProduct) {
+        const nextPrice = toNumber(
+          selectedProduct.unitPrice ?? selectedProduct.price ?? line.unitPrice,
+          line.unitPrice
+        );
 
-  const rows = [...container.querySelectorAll('.document-line-row')];
+        line.unitPrice = nextPrice;
 
-  return rows
-    .map((row) => ({
-      itemCode: row.querySelector('[name="itemCode"]')?.value?.trim() ?? '',
-      itemName: row.querySelector('[name="itemName"]')?.value?.trim() ?? '',
-      description: row.querySelector('[name="description"]')?.value?.trim() ?? '',
-      quantity: toNumber(row.querySelector('[name="quantity"]')?.value, 0),
-      unit: row.querySelector('[name="unit"]')?.value?.trim() || 'un',
-      unitPrice: toNumber(row.querySelector('[name="unitPrice"]')?.value, 0),
-    }))
-    .filter((line) => line.itemName || line.description || line.quantity > 0 || line.unitPrice > 0)
-    .map(normalizeLine);
-}
+        const unitPriceInput = row.querySelector('.doc-line-unit-price');
+        if (unitPriceInput) {
+          unitPriceInput.value = String(nextPrice);
+        }
+      }
+    }
 
-export function updateDocumentLinesSummary(target) {
-  const container =
-    typeof target === 'string' ? document.querySelector(target) : target;
+    syncRow(lineId, row);
+  });
 
-  if (!container) return;
+  container.addEventListener('click', (event) => {
+    const removeButton = event.target.closest('.doc-line-remove');
+    if (!removeButton) return;
 
-  const lines = getDocumentLines(container);
-  const totals = computeDocumentTotals(lines);
+    const row = removeButton.closest('.document-line-row');
+    if (!row) return;
 
-  const linesCountEl = container.querySelector('.js-lines-count');
-  const grandTotalEl = container.querySelector('.js-grand-total');
+    removeLine(row.dataset.lineId);
+  });
 
-  if (linesCountEl) linesCountEl.textContent = String(totals.linesCount);
-  if (grandTotalEl) grandTotalEl.textContent = totals.grandTotal.toFixed(2);
+  addButton?.addEventListener('click', addLine);
+
+  render();
+
+  return {
+    getLines() {
+      return lines.map((line) => ({
+        id: line.id,
+        product_id: line.product_id,
+        warehouse_id: line.warehouse_id,
+        quantity: toNumber(line.quantity, 0),
+        unitPrice: toNumber(line.unitPrice, 0),
+        total: calculateLineTotal(line),
+      }));
+    },
+
+    getSummary() {
+      return buildSummary(lines);
+    },
+
+    setLines(nextLines = []) {
+      lines = Array.isArray(nextLines) && nextLines.length
+        ? nextLines.map((line) => createLine(products, warehouses, line))
+        : [createLine(products, warehouses, { quantity: 1, unitPrice: 0 })];
+
+      render();
+    },
+
+    addLine,
+  };
 }
