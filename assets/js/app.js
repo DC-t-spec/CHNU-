@@ -1,4 +1,6 @@
-import { registerRoute, startRouter } from './core/router.js';
+// assets/js/app.js
+
+import { registerRoute, startRouter, navigateTo } from './core/router.js';
 import { renderDashboardPage } from './modules/dashboard/dashboard.page.js';
 import { renderDocumentsListPage } from './modules/documents/documents-list.page.js';
 import { renderDocumentDetailPage } from './modules/documents/document-detail.page.js';
@@ -6,7 +8,12 @@ import { renderDocumentFormPage } from './modules/documents/document-form.page.j
 import { renderInventoryBalancesPage } from './modules/inventory/inventory-balances.page.js';
 import { renderInventoryLedgerPage } from './modules/inventory/inventory-ledger.page.js';
 
+function redirectToDashboard() {
+  navigateTo('#dashboard');
+}
+
 function bootstrapRoutes() {
+  registerRoute('/', redirectToDashboard);
   registerRoute('/dashboard', renderDashboardPage);
 
   registerRoute('/documents', renderDocumentsListPage);
