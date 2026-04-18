@@ -1,4 +1,4 @@
-import { listDocuments } from './documents.service.js';
+import { listDocuments } from '../../services/documents.service.js';
 import { handleDocumentPosting } from './document-posting.js';
 import { handleDocumentCancel } from './document-cancel.js';
 
