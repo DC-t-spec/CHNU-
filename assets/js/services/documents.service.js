@@ -10,6 +10,8 @@ import {
   getDocumentTotals,
   postDocument,
   cancelDocument,
+  getProducts,
+  getWarehouses,
 } from '../core/state.js';
 
 function getStatusLabel(status) {
@@ -211,6 +213,24 @@ export function getDocumentsList(options = {}) {
 
 export function getDocument(documentId) {
   return normalizeDocument(getDocumentById(documentId));
+}
+
+export function getDocumentFormOptions() {
+  return {
+    products: (getProducts() || []).map((product) => ({
+      id: product.id,
+      name: product.name || '',
+      sku: product.sku || '',
+      label: product.sku
+        ? `${product.name} (${product.sku})`
+        : product.name || product.id,
+    })),
+    warehouses: (getWarehouses() || []).map((warehouse) => ({
+      id: warehouse.id,
+      name: warehouse.name || '',
+    })),
+    documentTypes: ['Transferência', 'Ajuste'],
+  };
 }
 
 export function createNewDocument(payload = {}) {
