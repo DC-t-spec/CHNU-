@@ -1,54 +1,57 @@
 // assets/js/modules/documents/document-cancel.js
 
-import { cancelDocument } from '../../services/documents.service.js';
-import { showConfirm } from '../../components/confirm.js';
-import { showToast } from '../../components/toast.js';
-import { showInputModal } from '../../components/modal.js';
+import { cancelDocumentService } from '../../services/documents.service.js';
+import { showConfirm } from '../../ui/confirm.js';
+import { showToast } from '../../ui/toast.js';
+import { showInputModal } from '../../ui/modal.js';
 
 export async function handleDocumentCancel(documentId, options = {}) {
-  if (!documentId) return;
+  if (!documentId) return false;
+
+  const { redirectTo = 'detail' } = options;
 
   const confirmed = await showConfirm({
     title: 'Cancelar documento',
-    message: 'Tens certeza que desejas cancelar este documento?',
-    confirmText: 'Sim, cancelar',
+    message: 'Tens certeza que desejas cancelar este documento? Esta acção irá gerar reversão de movimentos de stock.',
+    confirmText: 'Continuar',
     cancelText: 'Voltar',
     variant: 'danger',
   });
 
-  if (!confirmed) return;
+  if (!confirmed) {
+    return false;
+  }
 
   const reason = await showInputModal({
     title: 'Motivo do cancelamento',
     label: 'Informe o motivo',
-    placeholder: 'Ex: erro de lançamento, duplicado...',
+    placeholder: 'Ex: erro de lançamento, documento duplicado...',
     confirmText: 'Confirmar cancelamento',
-    cancelText: 'Voltar',
+    cancelText: 'Fechar',
     required: true,
     minLength: 3,
   });
 
   if (!reason) {
-    showToast('Cancelamento abortado: motivo não informado.', 'warning');
-    return;
+    showToast('Cancelamento abortado. Motivo não informado.', 'warning');
+    return false;
   }
 
   try {
-    await cancelDocument(documentId, reason);
+    cancelDocumentService(documentId, reason);
 
     showToast('Documento cancelado com sucesso.', 'success');
 
-    if (options.redirectTo === 'list') {
+    if (redirectTo === 'list') {
       window.location.hash = '#documents';
-      return;
+      return true;
     }
 
-    if (options.redirectTo === 'detail') {
-      window.location.hash = `#documents/view?id=${documentId}`;
-      return;
-    }
+    window.location.hash = `#documents/view?id=${documentId}`;
+    return true;
   } catch (error) {
     console.error(error);
-    showToast('Erro ao cancelar documento.', 'error');
+    showToast(error?.message || 'Erro ao cancelar documento.', 'error');
+    return false;
   }
 }
