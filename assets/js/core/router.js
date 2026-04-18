@@ -1,5 +1,3 @@
-// assets/js/core/router.js
-
 const routes = new Map();
 
 export function registerRoute(path, handler) {
@@ -12,12 +10,9 @@ export function getCurrentHash() {
 
 export function parseHash(hash = getCurrentHash()) {
   const cleanHash = hash.startsWith('#') ? hash.slice(1) : hash;
-  const [pathPart = '', queryString = ''] = cleanHash.split('?');
+  const [pathPart, queryString = ''] = cleanHash.split('?');
 
-  const normalizedPath = pathPart
-    ? (pathPart.startsWith('/') ? pathPart : `/${pathPart}`)
-    : '/';
-
+  const normalizedPath = pathPart.startsWith('/') ? pathPart : `/${pathPart}`;
   const segments = normalizedPath.split('/').filter(Boolean);
   const query = Object.fromEntries(new URLSearchParams(queryString).entries());
 
@@ -29,172 +24,94 @@ export function parseHash(hash = getCurrentHash()) {
   };
 }
 
-/* ===============================
-   MATCH ROUTE
-=============================== */
+function renderRouterError(error, parsed) {
+  const app = document.querySelector('#app');
+  if (!app) return;
 
-function matchRoute(hash = getCurrentHash()) {
+  console.error('Router render error:', error);
+
+  app.innerHTML = `
+    <section class="page-shell">
+      <div class="card">
+        <div class="card-header">
+          <h3>Erro ao abrir página</h3>
+        </div>
+
+        <div class="card-body" style="display:grid;gap:12px;">
+          <div><strong>Rota:</strong> ${parsed?.fullPath || '—'}</div>
+          <div><strong>Mensagem:</strong> ${error?.message || 'Erro desconhecido'}</div>
+
+          <div>
+            <a class="btn btn-secondary" href="#dashboard">Ir para dashboard</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+export function resolveRoute(hash = getCurrentHash()) {
   const parsed = parseHash(hash);
-
-  for (const [routePath, handler] of routes.entries()) {
-    const routeSegments = routePath.split('/').filter(Boolean);
-    const urlSegments = parsed.segments;
-
-    if (routeSegments.length !== urlSegments.length) continue;
-
-    const pathParams = {};
-    let isMatch = true;
-
-    for (let i = 0; i < routeSegments.length; i += 1) {
-      const routeSegment = routeSegments[i];
-      const urlSegment = urlSegments[i];
-
-      if (routeSegment.startsWith(':')) {
-        pathParams[routeSegment.slice(1)] = urlSegment;
-        continue;
-      }
-
-      if (routeSegment !== urlSegment) {
-        isMatch = false;
-        break;
-      }
-    }
-
-    if (isMatch) {
-      return {
-        handler,
-        route: routePath,
-        params: {
-          ...parsed.query,
-          ...pathParams,
-        },
-        pathParams,
-        query: parsed.query,
-        segments: parsed.segments,
-        fullPath: parsed.fullPath,
-      };
-    }
-  }
+  const handler = routes.get(parsed.fullPath);
 
   return {
-    handler: null,
-    route: null,
-    params: parsed.query,
-    pathParams: {},
-    query: parsed.query,
-    segments: parsed.segments,
-    fullPath: parsed.fullPath,
+    parsed,
+    handler,
   };
 }
 
-/* ===============================
-   SIDEBAR ACTIVE
-=============================== */
+function setActiveSidebarLink() {
+  const { fullPath } = parseHash();
 
-function updateSidebarActiveState(route = '') {
-  const sidebarLinks = document.querySelectorAll('.sidebar__link');
-  if (!sidebarLinks.length) return;
+  const links = document.querySelectorAll('.sidebar .nav-link, .sidebar a');
 
-  sidebarLinks.forEach((link) => {
-    link.classList.remove('active');
+  links.forEach((link) => {
+    const href = link.getAttribute('href') || '';
+    const linkPath = href.startsWith('#')
+      ? parseHash(href).fullPath
+      : null;
 
-    const target = link.getAttribute('href');
-    if (!target) return;
-
-    if (target === '#dashboard' && route === '/dashboard') {
-      link.classList.add('active');
-      return;
-    }
-
-    if (target === '#documents' && route.startsWith('/documents') && route !== '/documents/new') {
-      link.classList.add('active');
-      return;
-    }
-
-    if (target === '#documents/new' && route === '/documents/new') {
-      link.classList.add('active');
-      return;
-    }
-
-    if (target === '#inventory' && (route === '/inventory' || route === '/inventory-balances')) {
-      link.classList.add('active');
-      return;
-    }
-
-    if (target === '#inventory-balances' && route === '/inventory-balances') {
-      link.classList.add('active');
-      return;
-    }
-
-    if (target === '#inventory-ledger' && route === '/inventory-ledger') {
-      link.classList.add('active');
-    }
+    const isActive = linkPath === fullPath;
+    link.classList.toggle('active', isActive);
+    link.setAttribute('aria-current', isActive ? 'page' : 'false');
   });
 }
 
-/* ===============================
-   RUN ROUTE
-=============================== */
+export function startRouter(options = {}) {
+  const { notFound } = options;
 
-export async function runCurrentRoute() {
-  const resolved = matchRoute();
-  const appRoot = document.querySelector('#app');
-
-  updateSidebarActiveState(resolved.route || '');
-
-  if (!resolved.handler) {
-    if (appRoot) {
-      appRoot.innerHTML = `
-        <section class="page-shell">
-          <div class="card">
-            <h2>Página não encontrada</h2>
-            <p>A rota solicitada não existe.</p>
-          </div>
-        </section>
-      `;
+  async function renderCurrentRoute() {
+    if (!window.location.hash) {
+      window.location.hash = '#dashboard';
+      return;
     }
-    return;
-  }
 
-  try {
-    await resolved.handler({
-      route: resolved.route,
-      fullPath: resolved.fullPath,
-      params: resolved.params,
-      pathParams: resolved.pathParams,
-      query: resolved.query,
-      segments: resolved.segments,
-    });
-  } catch (error) {
-    console.error('Erro ao renderizar rota:', error);
+    const { parsed, handler } = resolveRoute();
 
-    if (appRoot) {
-      appRoot.innerHTML = `
-        <section class="page-shell">
-          <div class="card">
-            <h2>Erro ao abrir a página</h2>
-            <p>${error?.message || 'Erro inesperado.'}</p>
-          </div>
-        </section>
-      `;
+    setActiveSidebarLink();
+
+    if (!handler) {
+      if (typeof notFound === 'function') {
+        try {
+          await notFound(parsed);
+        } catch (error) {
+          renderRouterError(error, parsed);
+        }
+      } else {
+        renderRouterError(new Error('Rota não encontrada.'), parsed);
+      }
+      return;
+    }
+
+    try {
+      await handler(parsed);
+    } catch (error) {
+      renderRouterError(error, parsed);
     }
   }
-}
 
-/* ===============================
-   NAVIGATION
-=============================== */
+  window.addEventListener('hashchange', renderCurrentRoute);
+  window.addEventListener('load', renderCurrentRoute);
 
-export async function navigateTo(hash) {
-  if (window.location.hash === hash) {
-    await runCurrentRoute();
-    return;
-  }
-
-  window.location.hash = hash;
-}
-
-export function startRouter() {
-  window.addEventListener('hashchange', runCurrentRoute);
-  runCurrentRoute();
+  renderCurrentRoute();
 }
