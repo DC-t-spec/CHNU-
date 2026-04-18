@@ -1,34 +1,53 @@
-// assets/js/app.js
+import { registerRoute, startRouter } from './core/router.js';
 
-import { registerRoute, startRouter, navigateTo } from './core/router.js';
-import { renderDashboardPage } from './modules/dashboard/dashboard.page.js';
 import { renderDocumentsListPage } from './modules/documents/documents-list.page.js';
-import { renderDocumentDetailPage } from './modules/documents/document-detail.page.js';
 import { renderDocumentFormPage } from './modules/documents/document-form.page.js';
-import { renderInventoryBalancesPage } from './modules/inventory/inventory-balances.page.js';
-import { renderInventoryLedgerPage } from './modules/inventory/inventory-ledger.page.js';
+import { renderDocumentDetailPage } from './modules/documents/document-detail.page.js';
 
-function redirectToDashboard() {
-  navigateTo('#dashboard');
+function renderDashboardPage() {
+  const app = document.querySelector('#app');
+  if (!app) return;
+
+  app.innerHTML = `
+    <section class="page-shell">
+      <div class="page-header">
+        <div>
+          <h1>Dashboard</h1>
+          <p>Visão geral do sistema.</p>
+        </div>
+      </div>
+
+      <div class="empty-state">
+        <div class="empty-state__icon">📊</div>
+        <h3>Dashboard pronto</h3>
+        <p>Escolhe um módulo no menu lateral.</p>
+      </div>
+    </section>
+  `;
 }
 
-function bootstrapRoutes() {
-  registerRoute('/', redirectToDashboard);
-  registerRoute('/dashboard', renderDashboardPage);
+function renderNotFoundPage() {
+  const app = document.querySelector('#app');
+  if (!app) return;
 
-  registerRoute('/documents', renderDocumentsListPage);
-  registerRoute('/documents/new', renderDocumentFormPage);
-  registerRoute('/documents/view', renderDocumentDetailPage);
-  registerRoute('/documents/edit', renderDocumentFormPage);
-
-  registerRoute('/inventory', renderInventoryBalancesPage);
-  registerRoute('/inventory-balances', renderInventoryBalancesPage);
-  registerRoute('/inventory-ledger', renderInventoryLedgerPage);
+  app.innerHTML = `
+    <section class="page-shell">
+      <div class="empty-state">
+        <div class="empty-state__icon">404</div>
+        <h3>Página não encontrada</h3>
+        <p>A rota que tentaste abrir não existe.</p>
+      </div>
+    </section>
+  `;
 }
 
-function bootstrapApp() {
-  bootstrapRoutes();
-  startRouter();
-}
+registerRoute('/dashboard', renderDashboardPage);
 
-bootstrapApp();
+registerRoute('/documents', renderDocumentsListPage);
+registerRoute('/documents/new', renderDocumentFormPage);
+registerRoute('/documents/view', renderDocumentDetailPage);
+registerRoute('/documents/edit', renderDocumentFormPage);
+
+startRouter({
+  notFound: renderNotFoundPage,
+});
