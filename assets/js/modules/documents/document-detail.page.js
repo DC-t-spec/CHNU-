@@ -1,477 +1,179 @@
-// assets/js/modules/documents/document-detail.page.js
-
-import { getDocumentService } from '../../services/documents.service.js';
-import { getStockMoves, getProducts, getWarehouses } from '../../core/state.js';
+import { parseHash } from '../../core/router.js';
+import { getDocumentById } from '../../services/documents.service.js';
 import { handleDocumentPosting } from './document-posting.js';
 import { handleDocumentCancel } from './document-cancel.js';
 
-export async function renderDocumentDetailPage(context = {}) {
-  const appRoot = document.querySelector('#app');
-  const documentId = context?.params?.id || context?.query?.id || '';
+function formatDate(value) {
+  if (!value) return '—';
 
-  if (!documentId) {
-    appRoot.innerHTML = renderErrorState(
-      'Documento não encontrado',
-      'O identificador do documento não foi informado.'
-    );
+  try {
+    return new Intl.DateTimeFormat('pt-PT').format(new Date(value));
+  } catch {
+    return value;
+  }
+}
+
+function formatMoney(value) {
+  const number = Number(value || 0);
+  return number.toFixed(2);
+}
+
+function renderStatusBadge(status) {
+  const map = {
+    draft: 'Rascunho',
+    posted: 'Lançado',
+    cancelled: 'Cancelado',
+  };
+
+  return `<span class="badge badge-${status || 'draft'}">${map[status] || status}</span>`;
+}
+
+export async function renderDocumentDetailPage() {
+  const app = document.querySelector('#app');
+  if (!app) return;
+
+  const { query } = parseHash();
+  const documentId = query.id || '';
+  const documentData = getDocumentById(documentId);
+
+  if (!documentData) {
+    app.innerHTML = `
+      <section class="page-shell">
+        <div class="empty-state">
+          <div class="empty-state__icon">📄</div>
+          <h3>Documento não encontrado</h3>
+          <p>Não foi possível carregar o documento pedido.</p>
+        </div>
+      </section>
+    `;
     return;
   }
 
-  const doc = getDocumentService(documentId);
-
-  if (!doc) {
-    appRoot.innerHTML = renderErrorState(
-      'Documento não encontrado',
-      'O documento solicitado não existe ou já não está disponível.'
-    );
-    return;
-  }
-
-  const products = getProducts() || [];
-  const warehouses = getWarehouses() || [];
-  const moves = (getStockMoves() || [])
-    .filter((move) => move.reference_document_id === documentId)
-    .sort((a, b) => new Date(b.date) - new Date(a.date));
-
-  const stockImpact = buildStockImpact(moves, products, warehouses);
-
-  appRoot.innerHTML = `
-    <section class="page-shell document-detail-page">
-      <div class="page-header">
+  app.innerHTML = `
+    <section class="page-shell">
+      <div class="page-header" style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start;">
         <div>
-          <div class="page-title-row">
-            <h1>${escapeHtml(doc.number || 'Documento')}</h1>
-            <span class="status-chip status-${escapeHtml(doc.status || 'draft')}">
-              ${escapeHtml(doc.statusLabel || doc.status || '-')}
-            </span>
-          </div>
-          <p>Consulta detalhada do documento e impacto gerado no stock.</p>
+          <h1>Documento ${documentData.number || ''}</h1>
+          <p>Detalhe completo do documento.</p>
         </div>
 
-        <div class="page-actions">
-          <a href="#documents" class="btn btn-secondary">Voltar</a>
-
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <a class="btn btn-ghost" href="#documents">Voltar</a>
           ${
-            doc.canEdit
-              ? `<a href="#documents/edit?id=${doc.id}" class="btn btn-primary">Editar</a>`
+            documentData.status === 'draft'
+              ? `<a class="btn btn-secondary" href="#documents/edit?id=${documentData.id}">Editar</a>`
               : ''
           }
-
           ${
-            doc.canPost
-              ? `
-                <button
-                  type="button"
-                  class="btn btn-success"
-                  data-action="post-document"
-                  data-document-id="${doc.id}"
-                >
-                  Postar
-                </button>
-              `
+            documentData.status === 'draft'
+              ? `<button type="button" class="btn btn-primary js-post-document">Lançar</button>`
               : ''
           }
-
           ${
-            doc.canCancel
-              ? `
-                <button
-                  type="button"
-                  class="btn btn-danger"
-                  data-action="cancel-document"
-                  data-document-id="${doc.id}"
-                >
-                  Cancelar
-                </button>
-              `
+            documentData.status === 'posted'
+              ? `<button type="button" class="btn btn-danger js-cancel-document">Cancelar documento</button>`
               : ''
           }
         </div>
       </div>
 
-      <div class="documents-stats-grid">
-        <div class="documents-stat-card">
-          <span class="documents-stat-card__label">Linhas</span>
-          <strong class="documents-stat-card__value">${Number(doc.linesCount || 0)}</strong>
-        </div>
-
-        <div class="documents-stat-card">
-          <span class="documents-stat-card__label">Total</span>
-          <strong class="documents-stat-card__value">${formatCurrency(doc.grandTotal || 0)}</strong>
-        </div>
-
-        <div class="documents-stat-card">
-          <span class="documents-stat-card__label">Movimentos gerados</span>
-          <strong class="documents-stat-card__value">${moves.length}</strong>
-        </div>
-
-        <div class="documents-stat-card">
-          <span class="documents-stat-card__label">Impactos em stock</span>
-          <strong class="documents-stat-card__value">${stockImpact.length}</strong>
-        </div>
-      </div>
-
-      <div class="document-detail-grid">
+      <div class="grid grid-2" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;">
         <div class="card">
           <div class="card-header">
             <h3>Informação geral</h3>
           </div>
-
-          <div class="detail-grid">
-            <div class="detail-item">
-              <span class="detail-item__label">Número</span>
-              <strong class="detail-item__value">${escapeHtml(doc.number || '-')}</strong>
-            </div>
-
-            <div class="detail-item">
-              <span class="detail-item__label">Data</span>
-              <strong class="detail-item__value">${formatDate(doc.date)}</strong>
-            </div>
-
-            <div class="detail-item">
-              <span class="detail-item__label">Tipo</span>
-              <strong class="detail-item__value">${escapeHtml(doc.type || '-')}</strong>
-            </div>
-
-            <div class="detail-item">
-              <span class="detail-item__label">Status</span>
-              <strong class="detail-item__value">${escapeHtml(doc.statusLabel || '-')}</strong>
-            </div>
-
-            <div class="detail-item">
-              <span class="detail-item__label">Origem</span>
-              <strong class="detail-item__value">${escapeHtml(doc.origin || '-')}</strong>
-            </div>
-
-            <div class="detail-item">
-              <span class="detail-item__label">Destino</span>
-              <strong class="detail-item__value">${escapeHtml(doc.destination || '-')}</strong>
-            </div>
+          <div class="card-body" style="display:grid;gap:10px;">
+            <div><strong>Número:</strong> ${documentData.number || '—'}</div>
+            <div><strong>Tipo:</strong> ${documentData.type || '—'}</div>
+            <div><strong>Status:</strong> ${renderStatusBadge(documentData.status)}</div>
+            <div><strong>Data:</strong> ${formatDate(documentData.date)}</div>
+            <div><strong>Referência:</strong> ${documentData.reference || '—'}</div>
+            <div><strong>Origem:</strong> ${documentData.origin || '—'}</div>
+            <div><strong>Destino:</strong> ${documentData.destination || '—'}</div>
           </div>
         </div>
 
         <div class="card">
           <div class="card-header">
-            <h3>Eventos do documento</h3>
+            <h3>Estado do documento</h3>
           </div>
-
-          <div class="detail-grid">
-            <div class="detail-item">
-              <span class="detail-item__label">Postado em</span>
-              <strong class="detail-item__value">${formatDateTime(doc.postedAt)}</strong>
-            </div>
-
-            <div class="detail-item">
-              <span class="detail-item__label">Cancelado em</span>
-              <strong class="detail-item__value">${formatDateTime(doc.cancelledAt)}</strong>
-            </div>
-
-            <div class="detail-item detail-item--full">
-              <span class="detail-item__label">Motivo do cancelamento</span>
-              <strong class="detail-item__value">${escapeHtml(doc.cancelReason || '-')}</strong>
-            </div>
+          <div class="card-body" style="display:grid;gap:10px;">
+            <div><strong>Lançado em:</strong> ${formatDate(documentData.postedAt)}</div>
+            <div><strong>Cancelado em:</strong> ${formatDate(documentData.cancelledAt)}</div>
+            <div><strong>Motivo de cancelamento:</strong> ${documentData.cancelReason || '—'}</div>
+            <div><strong>Criado em:</strong> ${formatDate(documentData.createdAt)}</div>
+            <div><strong>Actualizado em:</strong> ${formatDate(documentData.updatedAt)}</div>
+            <div><strong>Observações:</strong> ${documentData.notes || '—'}</div>
           </div>
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" style="margin-top:16px;">
         <div class="card-header">
-          <h3>Linhas do documento</h3>
+          <h3>Linhas</h3>
         </div>
 
-        ${
-          doc.lines?.length
-            ? `
-              <div class="table-responsive">
-                <table class="data-table">
-                  <thead>
-                    <tr>
-                      <th>Produto</th>
-                      <th>Quantidade</th>
-                      <th>Preço unit.</th>
-                      <th>Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${doc.lines
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Item</th>
+                <th>Descrição</th>
+                <th>Qtd</th>
+                <th>Un</th>
+                <th>Preço Unit.</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${
+                documentData.lines.length
+                  ? documentData.lines
                       .map(
                         (line) => `
                           <tr>
-                            <td>${escapeHtml(line.item || '-')}</td>
-                            <td>${formatNumber(line.quantity)}</td>
-                            <td>${formatCurrency(line.unitPrice)}</td>
-                            <td><strong>${formatCurrency(line.total)}</strong></td>
+                            <td>${line.itemCode || '—'}</td>
+                            <td>${line.itemName || '—'}</td>
+                            <td>${line.description || '—'}</td>
+                            <td>${line.quantity}</td>
+                            <td>${line.unit || '—'}</td>
+                            <td>${formatMoney(line.unitPrice)}</td>
+                            <td>${formatMoney(line.total)}</td>
                           </tr>
                         `
                       )
-                      .join('')}
-                  </tbody>
-                </table>
-              </div>
-            `
-            : `
-              <div class="empty-state">
-                <h2>Sem linhas</h2>
-                <p>Este documento ainda não possui linhas registadas.</p>
-              </div>
-            `
-        }
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <h3>Movimentos gerados</h3>
+                      .join('')
+                  : `
+                    <tr>
+                      <td colspan="7" style="text-align:center;">Sem linhas registadas.</td>
+                    </tr>
+                  `
+              }
+            </tbody>
+          </table>
         </div>
 
-        ${
-          moves.length
-            ? `
-              <div class="table-responsive">
-                <table class="data-table">
-                  <thead>
-                    <tr>
-                      <th>Data</th>
-                      <th>Movimento</th>
-                      <th>Direcção</th>
-                      <th>Produto</th>
-                      <th>Armazém</th>
-                      <th>Qtd</th>
-                      <th>Custo unit.</th>
-                      <th>Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${moves
-                      .map((move) => {
-                        const product = products.find((p) => p.id === move.product_id);
-                        const warehouse = warehouses.find((w) => w.id === move.warehouse_id);
-
-                        return `
-                          <tr>
-                            <td>${formatDateTime(move.date)}</td>
-                            <td>${escapeHtml(move.movement_type || '-')}</td>
-                            <td>${escapeHtml((move.direction || '-').toUpperCase())}</td>
-                            <td>${escapeHtml(product?.name || move.product_id || '-')}</td>
-                            <td>${escapeHtml(warehouse?.name || move.warehouse_id || '-')}</td>
-                            <td>${formatNumber(move.qty)}</td>
-                            <td>${formatCurrency(move.unit_cost)}</td>
-                            <td><strong>${formatCurrency(move.total_cost)}</strong></td>
-                          </tr>
-                        `;
-                      })
-                      .join('')}
-                  </tbody>
-                </table>
-              </div>
-            `
-            : `
-              <div class="empty-state">
-                <h2>Sem movimentos</h2>
-                <p>Este documento ainda não gerou movimentos de stock.</p>
-              </div>
-            `
-        }
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <h3>Impacto em stock</h3>
-        </div>
-
-        ${
-          stockImpact.length
-            ? `
-              <div class="table-responsive">
-                <table class="data-table">
-                  <thead>
-                    <tr>
-                      <th>Produto</th>
-                      <th>Armazém</th>
-                      <th>Entradas</th>
-                      <th>Saídas</th>
-                      <th>Saldo líquido</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${stockImpact
-                      .map(
-                        (row) => `
-                          <tr>
-                            <td>${escapeHtml(row.productName)}</td>
-                            <td>${escapeHtml(row.warehouseName)}</td>
-                            <td>${formatNumber(row.qtyIn)}</td>
-                            <td>${formatNumber(row.qtyOut)}</td>
-                            <td><strong>${formatSignedNumber(row.netQty)}</strong></td>
-                          </tr>
-                        `
-                      )
-                      .join('')}
-                  </tbody>
-                </table>
-              </div>
-            `
-            : `
-              <div class="empty-state">
-                <h2>Sem impacto</h2>
-                <p>Não há impacto de stock calculado para este documento.</p>
-              </div>
-            `
-        }
-      </div>
-
-      <div class="card">
-        <div class="document-summary-bar">
-          <div class="document-summary-bar__item">
-            <span>Linhas</span>
-            <strong>${Number(doc.linesCount || 0)}</strong>
-          </div>
-
-          <div class="document-summary-bar__item">
-            <span>Total geral</span>
-            <strong>${formatCurrency(doc.grandTotal || 0)}</strong>
-          </div>
+        <div class="card-body" style="display:flex;justify-content:flex-end;gap:24px;">
+          <div><strong>Linhas:</strong> ${documentData.linesCount}</div>
+          <div><strong>Total:</strong> ${formatMoney(documentData.grandTotal)}</div>
         </div>
       </div>
     </section>
   `;
 
-  bindDetailActions();
-}
+  const postBtn = document.querySelector('.js-post-document');
+  const cancelBtn = document.querySelector('.js-cancel-document');
 
-function bindDetailActions() {
-  const appRoot = document.querySelector('#app');
-  if (!appRoot) return;
-
-  appRoot.addEventListener('click', handleDetailActionClick);
-}
-
-async function handleDetailActionClick(event) {
-  const trigger = event.target.closest('[data-action]');
-  if (!trigger) return;
-
-  const action = trigger.dataset.action;
-  const documentId = trigger.dataset.documentId;
-
-  if (!action || !documentId) return;
-
-  if (action === 'post-document') {
-    await handleDocumentPosting(documentId, { redirectTo: 'detail' });
-    return;
+  if (postBtn) {
+    postBtn.addEventListener('click', () => {
+      handleDocumentPosting(documentData.id);
+    });
   }
 
-  if (action === 'cancel-document') {
-    await handleDocumentCancel(documentId, { redirectTo: 'detail' });
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+      handleDocumentCancel(documentData.id);
+    });
   }
-}
-
-function buildStockImpact(moves = [], products = [], warehouses = []) {
-  const map = new Map();
-
-  moves.forEach((move) => {
-    const key = `${move.product_id}::${move.warehouse_id}`;
-    const current = map.get(key) || {
-      product_id: move.product_id,
-      warehouse_id: move.warehouse_id,
-      qtyIn: 0,
-      qtyOut: 0,
-      netQty: 0,
-    };
-
-    const qty = Number(move.qty || 0);
-
-    if (move.direction === 'in') {
-      current.qtyIn += qty;
-      current.netQty += qty;
-    }
-
-    if (move.direction === 'out') {
-      current.qtyOut += qty;
-      current.netQty -= qty;
-    }
-
-    map.set(key, current);
-  });
-
-  return [...map.values()].map((row) => {
-    const product = products.find((p) => p.id === row.product_id);
-    const warehouse = warehouses.find((w) => w.id === row.warehouse_id);
-
-    return {
-      ...row,
-      productName: product?.name || row.product_id || '-',
-      warehouseName: warehouse?.name || row.warehouse_id || '-',
-    };
-  });
-}
-
-function renderErrorState(title, message) {
-  return `
-    <section class="page-shell">
-      <div class="card">
-        <h2>${escapeHtml(title)}</h2>
-        <p>${escapeHtml(message)}</p>
-        <a href="#documents" class="btn btn-primary">Voltar à lista</a>
-      </div>
-    </section>
-  `;
-}
-
-function formatDate(value) {
-  if (!value) return '-';
-
-  const [year, month, day] = String(value).split('-');
-  if (!year || !month || !day) return value;
-
-  return `${day}/${month}/${year}`;
-}
-
-function formatDateTime(value) {
-  if (!value) return '-';
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString('pt-PT', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function formatCurrency(value) {
-  return Number(value || 0).toLocaleString('pt-PT', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
-function formatNumber(value) {
-  return Number(value || 0).toLocaleString('pt-PT', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  });
-}
-
-function formatSignedNumber(value) {
-  const number = Number(value || 0);
-  const formatted = number.toLocaleString('pt-PT', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  });
-
-  return number > 0 ? `+${formatted}` : formatted;
-}
-
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
 }
