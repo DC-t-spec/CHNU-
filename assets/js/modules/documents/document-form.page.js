@@ -264,10 +264,19 @@ export async function renderDocumentFormPage(context = {}) {
 
     const validationError = validateBeforeSave(payload);
 
+    if (documentId) {
+  try {
+    assertEditable(documentId);
+  } catch (err) {
+    showToast(err.message, 'error');
+    return;
+  }
+}
     if (validationError) {
       showToast(validationError, 'error');
       return;
     }
+    
 
     try {
       const saved = saveDocumentService(payload);
