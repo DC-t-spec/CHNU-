@@ -1,65 +1,23 @@
-import { executeDocumentCancel } from './documents.service.js';
+// assets/js/modules/documents/document-cancel.js
+
+import { cancelDocumentService } from '../../services/documents.service.js';
 import { showConfirm } from '../../ui/confirm.js';
 import { showToast } from '../../ui/toast.js';
-import { showInputModal } from '../../ui/modal.js';
 
 export async function handleDocumentCancel(documentId, options = {}) {
-  const {
-    redirectTo = 'detail',
-    onSuccess = null,
-    userId = 'system',
-  } = options;
+  const { redirectTo = 'detail', reason = 'Cancelado pelo utilizador' } = options;
 
-  const confirmed = await showConfirm({
-    title: 'Cancelar documento',
-    message: 'Deseja cancelar este documento?',
-    confirmText: 'Sim, continuar',
-    cancelText: 'Voltar',
-  });
+  const confirmed = await showConfirm('Deseja cancelar este documento?');
+  if (!confirmed) return false;
 
-  if (!confirmed) return;
+  await cancelDocumentService(documentId, null, reason);
+  showToast('Documento cancelado com sucesso.');
 
-  const reason = await showInputModal({
-    title: 'Cancelar documento',
-    label: 'Motivo do cancelamento',
-    placeholder: 'Digite o motivo...',
-    confirmText: 'Cancelar documento',
-    cancelText: 'Voltar',
-  });
-
-  if (reason === null) return;
-
-  if (!reason.trim()) {
-    showToast({
-      message: 'Motivo é obrigatório.',
-      type: 'error',
-    });
-    return;
+  if (redirectTo === 'list') {
+    window.location.hash = '#documents';
+    return true;
   }
 
-  try {
-    executeDocumentCancel(documentId, reason.trim(), userId);
-
-    showToast({
-      message: 'Documento cancelado com sucesso.',
-      type: 'success',
-    });
-
-    if (typeof onSuccess === 'function') {
-      onSuccess();
-      return;
-    }
-
-    if (redirectTo === 'list') {
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
-      return;
-    }
-
-    window.location.hash = `#documents/view?id=${documentId}`;
-  } catch (error) {
-    showToast({
-      message: error.message || 'Erro ao cancelar documento.',
-      type: 'error',
-    });
-  }
+  window.location.hash = `#documents/view?id=${documentId}`;
+  return true;
 }
