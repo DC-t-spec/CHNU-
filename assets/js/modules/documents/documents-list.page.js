@@ -1,45 +1,31 @@
-import { listDocuments } from '../../services/documents.service.js';
+// assets/js/modules/documents/documents-list.page.js
+
+import { getDocumentsList } from '../../services/documents.service.js';
 import { handleDocumentPosting } from './document-posting.js';
 import { handleDocumentCancel } from './document-cancel.js';
 
-const DEFAULT_PAGE_SIZE = 5;
+const DEFAULT_PAGE_SIZE = 10;
 
 export async function renderDocumentsListPage() {
   const appRoot = document.querySelector('#app');
   const filters = getCurrentListFilters();
 
-const result = listDocuments({
-  filters: {
+  const result = getDocumentsList({
     query: filters.query,
     status: filters.status,
-  },
-  sort: {
-    field: 'date',
-    direction: filters.sortBy === 'dateAsc' ? 'asc' : 'desc',
-  },
-  pagination: {
+    sortBy: filters.sortBy,
     page: filters.page,
     pageSize: DEFAULT_PAGE_SIZE,
-  },
-});
+  });
 
-const { data, meta, summary } = result;
-
-const items = data;
-const summaries = summary;
-const pagination = {
-  page: meta.page,
-  totalPages: meta.totalPages,
-  hasPrev: meta.page > 1,
-  hasNext: meta.page < meta.totalPages,
-};
+  const { items, summaries, pagination } = result;
 
   appRoot.innerHTML = `
     <section class="page-shell documents-page">
       <div class="page-header">
         <div>
           <h1>Documentos</h1>
-          <p>Gestão de documentos operacionais do sistema</p>
+          <p>Gestão de documentos operacionais com integração ao stock.</p>
         </div>
 
         <div class="page-actions">
@@ -93,6 +79,16 @@ const pagination = {
             </select>
           </div>
 
+          <div class="toolbar__group">
+            <label for="documents-sort" class="toolbar__label">Ordenação</label>
+            <select id="documents-sort" name="sortBy" class="toolbar__select">
+              <option value="dateDesc" ${filters.sortBy === 'dateDesc' ? 'selected' : ''}>Data ↓</option>
+              <option value="dateAsc" ${filters.sortBy === 'dateAsc' ? 'selected' : ''}>Data ↑</option>
+              <option value="numberAsc" ${filters.sortBy === 'numberAsc' ? 'selected' : ''}>Número ↑</option>
+              <option value="numberDesc" ${filters.sortBy === 'numberDesc' ? 'selected' : ''}>Número ↓</option>
+            </select>
+          </div>
+
           <div class="toolbar__group toolbar__group--actions">
             <button type="submit" class="btn btn-primary">Aplicar</button>
             <button type="button" class="btn btn-secondary" id="documents-reset-filters">Limpar</button>
@@ -109,12 +105,12 @@ const pagination = {
                   <thead>
                     <tr>
                       <th>Número</th>
-                      <th data-sort="date" class="sortable">
-                        Data ${renderSortIndicator(filters.sortBy, 'date')}
-                      </th>
+                      <th>Data</th>
                       <th>Tipo</th>
                       <th>Origem</th>
                       <th>Destino</th>
+                      <th>Linhas</th>
+                      <th>Total</th>
                       <th>Status</th>
                       <th>Ações</th>
                     </tr>
@@ -124,14 +120,18 @@ const pagination = {
                       .map(
                         (doc) => `
                           <tr>
-                            <td>${doc.number || '-'}</td>
-                            <td>${formatDocumentDate(doc.date)}</td>
-                            <td>${doc.type || '-'}</td>
-                            <td>${doc.origin || '-'}</td>
-                            <td>${doc.destination || '-'}</td>
                             <td>
-                              <span class="status-chip status-${doc.status}">
-                                ${doc.statusLabel}
+                              <strong>${escapeHtml(doc.number || '-')}</strong>
+                            </td>
+                            <td>${formatDocumentDate(doc.date)}</td>
+                            <td>${escapeHtml(doc.type || '-')}</td>
+                            <td>${escapeHtml(doc.origin || '-')}</td>
+                            <td>${escapeHtml(doc.destination || '-')}</td>
+                            <td>${Number(doc.linesCount || 0)}</td>
+                            <td><strong>${formatCurrency(doc.grandTotal || 0)}</strong></td>
+                            <td>
+                              <span class="status-chip status-${escapeHtml(doc.status)}">
+                                ${escapeHtml(doc.statusLabel)}
                               </span>
                             </td>
                             <td>
@@ -140,9 +140,7 @@ const pagination = {
 
                                 ${
                                   doc.canEdit
-                                    ? `
-                                      <a href="#documents/edit?id=${doc.id}" class="btn btn-sm btn-primary">Editar</a>
-                                    `
+                                    ? `<a href="#documents/edit?id=${doc.id}" class="btn btn-sm btn-primary">Editar</a>`
                                     : ''
                                 }
 
@@ -187,6 +185,7 @@ const pagination = {
 
               <div class="pagination">
                 <button
+                  type="button"
                   class="btn btn-secondary"
                   data-page="prev"
                   ${pagination.hasPrev ? '' : 'disabled'}
@@ -199,6 +198,7 @@ const pagination = {
                 </span>
 
                 <button
+                  type="button"
                   class="btn btn-secondary"
                   data-page="next"
                   ${pagination.hasNext ? '' : 'disabled'}
@@ -226,7 +226,6 @@ function bindDocumentsListEvents() {
   const toolbarForm = document.querySelector('#documents-toolbar-form');
   const resetButton = document.querySelector('#documents-reset-filters');
   const appRoot = document.querySelector('#app');
-  const sortHeaders = document.querySelectorAll('[data-sort]');
   const paginationButtons = document.querySelectorAll('[data-page]');
 
   if (toolbarForm) {
@@ -240,10 +239,6 @@ function bindDocumentsListEvents() {
   if (appRoot) {
     appRoot.addEventListener('click', handleListActionClick);
   }
-
-  sortHeaders.forEach((header) => {
-    header.addEventListener('click', handleSortClick);
-  });
 
   paginationButtons.forEach((button) => {
     button.addEventListener('click', handlePaginationClick);
@@ -276,12 +271,12 @@ async function handleListActionClick(event) {
 function handleToolbarSubmit(event) {
   event.preventDefault();
 
-  const currentFilters = getCurrentListFilters();
   const form = event.currentTarget;
   const formData = new FormData(form);
 
   const query = formData.get('query')?.toString().trim() || '';
   const status = formData.get('status')?.toString().trim() || 'all';
+  const sortBy = formData.get('sortBy')?.toString().trim() || 'dateDesc';
 
   const params = new URLSearchParams();
 
@@ -293,8 +288,8 @@ function handleToolbarSubmit(event) {
     params.set('status', status);
   }
 
-  if (currentFilters.sortBy && currentFilters.sortBy !== 'dateDesc') {
-    params.set('sortBy', currentFilters.sortBy);
+  if (sortBy && sortBy !== 'dateDesc') {
+    params.set('sortBy', sortBy);
   }
 
   params.set('page', '1');
@@ -307,34 +302,19 @@ function handleToolbarReset() {
   window.location.hash = '#documents';
 }
 
-function handleSortClick(event) {
-  const field = event.currentTarget.dataset.sort;
-  const filters = getCurrentListFilters();
-  const params = buildParamsFromFilters(filters);
-
-  if (field === 'date') {
-    const nextSort = filters.sortBy === 'dateAsc' ? 'dateDesc' : 'dateAsc';
-
-    if (nextSort !== 'dateDesc') {
-      params.set('sortBy', nextSort);
-    } else {
-      params.delete('sortBy');
-    }
-  }
-
-  params.set('page', '1');
-
-  const queryString = params.toString();
-  window.location.hash = queryString ? `#documents?${queryString}` : '#documents';
-}
-
 function handlePaginationClick(event) {
   const action = event.currentTarget.dataset.page;
   const filters = getCurrentListFilters();
-  const nextPage =
-    action === 'prev'
-      ? Math.max(1, filters.page - 1)
-      : filters.page + 1;
+
+  let nextPage = filters.page;
+
+  if (action === 'prev') {
+    nextPage = Math.max(1, filters.page - 1);
+  }
+
+  if (action === 'next') {
+    nextPage = filters.page + 1;
+  }
 
   const params = buildParamsFromFilters(filters);
 
@@ -383,26 +363,24 @@ function buildParamsFromFilters(filters) {
   return params;
 }
 
-function renderSortIndicator(sortBy, field) {
-  if (field !== 'date') return '';
-
-  if (sortBy === 'dateAsc') return '↑';
-  if (sortBy === 'dateDesc') return '↓';
-
-  return '';
-}
-
 function formatDocumentDate(value) {
   if (!value) return '-';
 
-  const [year, month, day] = value.split('-');
+  const [year, month, day] = String(value).split('-');
   if (!year || !month || !day) return value;
 
   return `${day}/${month}/${year}`;
 }
 
+function formatCurrency(value) {
+  return Number(value || 0).toLocaleString('pt-PT', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 function escapeHtml(value) {
-  return String(value)
+  return String(value ?? '')
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
