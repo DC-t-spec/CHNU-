@@ -1,39 +1,85 @@
-// assets/js/services/documents.service.js
-
 import {
   searchDocuments,
   getDocumentById,
   createDocument,
   updateDocument,
-  deleteDocument,
+  addDocumentLine,
+  updateDocumentLine,
+  removeDocumentLine,
+  getDocumentLines,
+  getDocumentTotals,
   postDocument,
   cancelDocument,
 } from '../core/state.js';
 
-/* =========================================================
-   NORMALIZERS
-========================================================= */
+function getStatusLabel(status) {
+  switch (status) {
+    case 'draft':
+      return 'Draft';
+    case 'posted':
+      return 'Posted';
+    case 'cancelled':
+      return 'Cancelled';
+    default:
+      return status || '-';
+  }
+}
 
-function normalizeDocument(doc) {
+function normalizeLine(line = {}) {
   return {
-    ...doc,
-    grandTotal: doc.grandTotal ?? doc.total ?? 0,
-    linesCount: doc.lines?.length || 0,
+    ...line,
+    quantity: Number(line.quantity || 0),
+    unitPrice: Number(line.unitPrice || 0),
+    total:
+      line.total != null
+        ? Number(line.total || 0)
+        : Number(line.quantity || 0) * Number(line.unitPrice || 0),
   };
 }
 
-/* =========================================================
-   FILTERS
-========================================================= */
+function normalizeDocument(doc) {
+  if (!doc) return null;
+
+  const lines = Array.isArray(doc.lines) ? doc.lines.map(normalizeLine) : [];
+  const totals = doc.totals || {};
+
+  const linesCount =
+    totals.linesCount != null ? Number(totals.linesCount || 0) : lines.length;
+
+  const grandTotal =
+    totals.grandTotal != null
+      ? Number(totals.grandTotal || 0)
+      : lines.reduce((sum, line) => sum + Number(line.total || 0), 0);
+
+  return {
+    ...doc,
+    lines,
+    totals: {
+      linesCount,
+      grandTotal,
+    },
+    linesCount,
+    grandTotal,
+    statusLabel: getStatusLabel(doc.status),
+    canEdit: doc.status === 'draft',
+    canPost: doc.status === 'draft',
+    canCancel: doc.status === 'posted',
+  };
+}
 
 function applyFilters(list, filters = {}) {
   let result = [...list];
 
   if (filters.query) {
-    const q = filters.query.toLowerCase();
+    const q = String(filters.query).trim().toLowerCase();
 
     result = result.filter((doc) =>
-      [doc.number, doc.type, doc.origin, doc.destination]
+      [
+        doc.number,
+        doc.type,
+        doc.origin,
+        doc.destination,
+      ]
         .join(' ')
         .toLowerCase()
         .includes(q)
@@ -41,58 +87,45 @@ function applyFilters(list, filters = {}) {
   }
 
   if (filters.status && filters.status !== 'all') {
-    result = result.filter((d) => d.status === filters.status);
-  }
-
-  if (filters.type && filters.type !== 'all') {
-    result = result.filter((d) => d.type === filters.type);
-  }
-
-  if (filters.dateFrom) {
-    result = result.filter((d) => new Date(d.date) >= new Date(filters.dateFrom));
-  }
-
-  if (filters.dateTo) {
-    result = result.filter((d) => new Date(d.date) <= new Date(filters.dateTo));
+    result = result.filter((doc) => doc.status === filters.status);
   }
 
   return result;
 }
 
-/* =========================================================
-   SORT
-========================================================= */
-
 function applySort(list, sort = {}) {
-  const { field = 'date', direction = 'desc' } = sort;
+  const field = sort.field || 'date';
+  const direction = sort.direction === 'asc' ? 'asc' : 'desc';
 
   return [...list].sort((a, b) => {
-    let A = a[field];
-    let B = b[field];
+    let valueA;
+    let valueB;
 
-    if (field === 'date') {
-      A = new Date(A);
-      B = new Date(B);
+    if (field === 'number') {
+      valueA = a.number || '';
+      valueB = b.number || '';
+      const compare = valueA.localeCompare(valueB);
+      return direction === 'asc' ? compare : -compare;
     }
 
-    if (A < B) return direction === 'asc' ? -1 : 1;
-    if (A > B) return direction === 'asc' ? 1 : -1;
+    valueA = new Date(a.date || 0).getTime();
+    valueB = new Date(b.date || 0).getTime();
+
+    if (valueA < valueB) return direction === 'asc' ? -1 : 1;
+    if (valueA > valueB) return direction === 'asc' ? 1 : -1;
     return 0;
   });
 }
 
-/* =========================================================
-   PAGINATION
-========================================================= */
-
 function applyPagination(list, pagination = {}) {
-  const page = Number(pagination.page || 1);
-  const pageSize = Number(pagination.pageSize || 10);
+  const page = Math.max(1, Number(pagination.page || 1));
+  const pageSize = Math.max(1, Number(pagination.pageSize || 10));
 
   const total = list.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(page, totalPages);
 
-  const start = (page - 1) * pageSize;
+  const start = (safePage - 1) * pageSize;
   const end = start + pageSize;
 
   return {
@@ -100,28 +133,22 @@ function applyPagination(list, pagination = {}) {
     meta: {
       total,
       totalPages,
-      page,
+      page: safePage,
       pageSize,
+      hasPrev: safePage > 1,
+      hasNext: safePage < totalPages,
     },
   };
 }
 
-/* =========================================================
-   SUMMARY
-========================================================= */
-
 function buildSummary(list) {
   return {
     total: list.length,
-    draft: list.filter((d) => d.status === 'draft').length,
-    posted: list.filter((d) => d.status === 'posted').length,
-    cancelled: list.filter((d) => d.status === 'cancelled').length,
+    draft: list.filter((doc) => doc.status === 'draft').length,
+    posted: list.filter((doc) => doc.status === 'posted').length,
+    cancelled: list.filter((doc) => doc.status === 'cancelled').length,
   };
 }
-
-/* =========================================================
-   PUBLIC API
-========================================================= */
 
 export function listDocuments(options = {}) {
   const {
@@ -130,13 +157,16 @@ export function listDocuments(options = {}) {
     pagination = { page: 1, pageSize: 10 },
   } = options;
 
-  const raw = searchDocuments({});
-  const normalized = raw.map(normalizeDocument);
+  const raw = searchDocuments({
+    query: '',
+    status: '',
+    sortBy: 'date_desc',
+  });
 
+  const normalized = raw.map(normalizeDocument);
   const filtered = applyFilters(normalized, filters);
   const sorted = applySort(filtered, sort);
   const paginated = applyPagination(sorted, pagination);
-
   const summary = buildSummary(normalized);
 
   return {
@@ -146,33 +176,139 @@ export function listDocuments(options = {}) {
   };
 }
 
-export function getDocument(documentId) {
-  const doc = getDocumentById(documentId);
-  if (!doc) return null;
-
-  return normalizeDocument(doc);
-}
-
-export function createNewDocument(payload) {
-  return createDocument({
-    ...payload,
-    status: 'draft',
-    lines: payload.lines || [],
+export function getDocumentsList(options = {}) {
+  const result = listDocuments({
+    filters: {
+      query: options.query || '',
+      status: options.status || 'all',
+    },
+    sort: {
+      field: options.sortBy?.startsWith('number') ? 'number' : 'date',
+      direction:
+        options.sortBy === 'dateAsc' || options.sortBy === 'numberAsc'
+          ? 'asc'
+          : 'desc',
+    },
+    pagination: {
+      page: options.page || 1,
+      pageSize: options.pageSize || 10,
+    },
   });
+
+  return {
+    items: result.data,
+    summaries: result.summary,
+    pagination: {
+      page: result.meta.page,
+      totalPages: result.meta.totalPages,
+      hasPrev: result.meta.hasPrev,
+      hasNext: result.meta.hasNext,
+      total: result.meta.total,
+      pageSize: result.meta.pageSize,
+    },
+  };
 }
 
-export function updateExistingDocument(documentId, payload) {
-  return updateDocument(documentId, payload);
+export function getDocument(documentId) {
+  return normalizeDocument(getDocumentById(documentId));
 }
 
-export function removeDocument(documentId) {
-  return deleteDocument(documentId);
+export function createNewDocument(payload = {}) {
+  const created = createDocument({
+    date: payload.date || '',
+    type: payload.type || '',
+    origin: payload.origin || '',
+    destination: payload.destination || '',
+  });
+
+  const lines = Array.isArray(payload.lines) ? payload.lines : [];
+
+  lines.forEach((line) => {
+    addDocumentLine(created.id, {
+      product_id: line.product_id || '',
+      item: line.item || '',
+      quantity: Number(line.quantity || 0),
+      unitPrice: Number(line.unitPrice || 0),
+    });
+  });
+
+  return getDocument(created.id);
 }
 
-export async function postDocumentService(documentId, userId = null) {
-  return await postDocument(documentId, userId);
+export function updateExistingDocument(documentId, payload = {}) {
+  updateDocument(documentId, {
+    date: payload.date || '',
+    type: payload.type || '',
+    origin: payload.origin || '',
+    destination: payload.destination || '',
+  });
+
+  const currentLines = getDocumentLines(documentId) || [];
+  const nextLines = Array.isArray(payload.lines) ? payload.lines : [];
+
+  currentLines.forEach((line) => {
+    removeDocumentLine(documentId, line.id);
+  });
+
+  nextLines.forEach((line) => {
+    addDocumentLine(documentId, {
+      product_id: line.product_id || '',
+      item: line.item || '',
+      quantity: Number(line.quantity || 0),
+      unitPrice: Number(line.unitPrice || 0),
+    });
+  });
+
+  return getDocument(documentId);
 }
 
-export async function cancelDocumentService(documentId, userId = null, reason = '') {
-  return await cancelDocument(documentId, userId, reason);
+export function addDocumentLineService(documentId, lineData) {
+  return normalizeLine(
+    addDocumentLine(documentId, {
+      product_id: lineData.product_id || '',
+      item: lineData.item || '',
+      quantity: Number(lineData.quantity || 0),
+      unitPrice: Number(lineData.unitPrice || 0),
+    })
+  );
+}
+
+export function updateDocumentLineService(documentId, lineId, lineData) {
+  return normalizeLine(
+    updateDocumentLine(documentId, lineId, {
+      product_id: lineData.product_id || '',
+      item: lineData.item || '',
+      quantity: Number(lineData.quantity || 0),
+      unitPrice: Number(lineData.unitPrice || 0),
+    })
+  );
+}
+
+export function removeDocumentLineService(documentId, lineId) {
+  removeDocumentLine(documentId, lineId);
+  return getDocument(documentId);
+}
+
+export function getDocumentTotalsService(documentId) {
+  const totals = getDocumentTotals(documentId) || {
+    linesCount: 0,
+    grandTotal: 0,
+  };
+
+  return {
+    linesCount: Number(totals.linesCount || 0),
+    grandTotal: Number(totals.grandTotal || 0),
+  };
+}
+
+export function postDocumentService(documentId) {
+  return normalizeDocument(postDocument(documentId));
+}
+
+export function cancelDocumentService(documentId, reason = '') {
+  return normalizeDocument(cancelDocument(documentId, reason));
+}
+
+export function removeDocument() {
+  throw new Error('Remoção de documentos não suportada neste sistema.');
 }
