@@ -3,6 +3,7 @@
 import {
   getDocumentService,
   saveDocumentService,
+  getProductsService,
   getWarehousesService,
 } from '../../services/documents.service.js';
 
@@ -10,12 +11,17 @@ export async function renderDocumentFormPage(context = {}) {
   const appRoot = document.querySelector('#app');
   const documentId = context?.params?.id || context?.query?.id || null;
 
+  const products = getProductsService();
   const warehouses = getWarehousesService();
   const existing = documentId ? getDocumentService(documentId) : null;
 
   let lines = existing?.lines?.length
-    ? [...existing.lines]
-    : [{ item: '', quantity: 1, unitPrice: 0 }];
+    ? existing.lines.map(l => ({
+        product_id: l.product_id || '',
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+      }))
+    : [{ product_id: '', quantity: 1, unitPrice: 0 }];
 
   appRoot.innerHTML = `
     <section class="page-shell documents-form-page">
@@ -23,6 +29,7 @@ export async function renderDocumentFormPage(context = {}) {
         <div>
           <h1>${documentId ? 'Editar Documento' : 'Novo Documento'}</h1>
         </div>
+
         <div class="page-actions">
           <a href="#documents" class="btn btn-secondary">Voltar</a>
           <button class="btn btn-primary" id="save-document">Guardar</button>
@@ -40,9 +47,8 @@ export async function renderDocumentFormPage(context = {}) {
           <div class="form-group">
             <label>Tipo</label>
             <select id="doc-type">
-              <option value="transfer">Transferência</option>
-              <option value="entrada">Entrada</option>
-              <option value="saida">Saída</option>
+              <option value="Transferência">Transferência</option>
+              <option value="Ajuste">Ajuste</option>
             </select>
           </div>
 
@@ -81,8 +87,21 @@ export async function renderDocumentFormPage(context = {}) {
     </section>
   `;
 
+  setInitialValues();
   renderLines();
   bindEvents();
+
+  function setInitialValues() {
+    if (!existing) return;
+
+    document.getElementById('doc-type').value = existing.type || 'Transferência';
+
+    const origin = warehouses.find(w => w.name === existing.origin);
+    const destination = warehouses.find(w => w.name === existing.destination);
+
+    if (origin) document.getElementById('doc-origin').value = origin.id;
+    if (destination) document.getElementById('doc-destination').value = destination.id;
+  }
 
   function renderLines() {
     const container = document.getElementById('lines-container');
@@ -90,9 +109,20 @@ export async function renderDocumentFormPage(context = {}) {
     container.innerHTML = lines
       .map((l, i) => `
         <div class="document-line" data-index="${i}" style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;margin-bottom:10px;">
-          <input type="text" placeholder="Item" value="${l.item}" class="line-item"/>
-          <input type="number" value="${l.quantity}" class="line-qty"/>
-          <input type="number" value="${l.unitPrice}" class="line-price"/>
+          
+          <select class="line-product">
+            <option value="">Produto</option>
+            ${products.map(p => `
+              <option value="${p.id}" ${p.id === l.product_id ? 'selected' : ''}>
+                ${p.label}
+              </option>
+            `).join('')}
+          </select>
+
+          <input type="number" class="line-qty" value="${l.quantity}" />
+
+          <input type="number" class="line-price" value="${l.unitPrice}" />
+
           <button class="btn btn-danger remove-line">X</button>
         </div>
       `)
@@ -103,7 +133,7 @@ export async function renderDocumentFormPage(context = {}) {
 
   function bindEvents() {
     document.getElementById('add-line').onclick = () => {
-      lines.push({ item: '', quantity: 1, unitPrice: 0 });
+      lines.push({ product_id: '', quantity: 1, unitPrice: 0 });
       renderLines();
     };
 
@@ -113,7 +143,7 @@ export async function renderDocumentFormPage(context = {}) {
 
       const i = Number(row.dataset.index);
 
-      lines[i].item = row.querySelector('.line-item').value;
+      lines[i].product_id = row.querySelector('.line-product').value;
       lines[i].quantity = Number(row.querySelector('.line-qty').value);
       lines[i].unitPrice = Number(row.querySelector('.line-price').value);
 
@@ -139,7 +169,7 @@ export async function renderDocumentFormPage(context = {}) {
   }
 
   function handleSave() {
-    const data = {
+    const payload = {
       id: documentId,
       date: document.getElementById('doc-date').value,
       type: document.getElementById('doc-type').value,
@@ -148,7 +178,7 @@ export async function renderDocumentFormPage(context = {}) {
       lines,
     };
 
-    saveDocumentService(data);
+    saveDocumentService(payload);
 
     window.location.hash = '#documents';
   }
