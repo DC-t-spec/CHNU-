@@ -1,3 +1,5 @@
+// assets/js/services/documents.service.js
+
 import {
   searchDocuments,
   getDocumentById,
@@ -14,6 +16,14 @@ import {
   getWarehouses,
 } from '../core/state.js';
 
+/* =========================================================
+   NORMALIZERS
+========================================================= */
+
+function normalizeText(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
 function getStatusLabel(status) {
   switch (status) {
     case 'draft':
@@ -28,14 +38,17 @@ function getStatusLabel(status) {
 }
 
 function normalizeLine(line = {}) {
+  const quantity = Number(line.quantity || 0);
+  const unitPrice = Number(line.unitPrice || 0);
+
   return {
     ...line,
-    quantity: Number(line.quantity || 0),
-    unitPrice: Number(line.unitPrice || 0),
+    quantity,
+    unitPrice,
     total:
       line.total != null
         ? Number(line.total || 0)
-        : Number(line.quantity || 0) * Number(line.unitPrice || 0),
+        : quantity * unitPrice,
   };
 }
 
@@ -46,7 +59,9 @@ function normalizeDocument(doc) {
   const totals = doc.totals || {};
 
   const linesCount =
-    totals.linesCount != null ? Number(totals.linesCount || 0) : lines.length;
+    totals.linesCount != null
+      ? Number(totals.linesCount || 0)
+      : lines.length;
 
   const grandTotal =
     totals.grandTotal != null
@@ -69,11 +84,31 @@ function normalizeDocument(doc) {
   };
 }
 
+function normalizeProduct(product = {}) {
+  return {
+    ...product,
+    label: product.sku
+      ? `${product.name} (${product.sku})`
+      : product.name || product.id || '-',
+  };
+}
+
+function normalizeWarehouse(warehouse = {}) {
+  return {
+    ...warehouse,
+    label: warehouse.name || warehouse.id || '-',
+  };
+}
+
+/* =========================================================
+   FILTERS / SORT / PAGINATION
+========================================================= */
+
 function applyFilters(list, filters = {}) {
   let result = [...list];
 
   if (filters.query) {
-    const q = String(filters.query).trim().toLowerCase();
+    const q = normalizeText(filters.query);
 
     result = result.filter((doc) =>
       [
@@ -92,6 +127,10 @@ function applyFilters(list, filters = {}) {
     result = result.filter((doc) => doc.status === filters.status);
   }
 
+  if (filters.type && filters.type !== 'all') {
+    result = result.filter((doc) => doc.type === filters.type);
+  }
+
   return result;
 }
 
@@ -104,8 +143,8 @@ function applySort(list, sort = {}) {
     let valueB;
 
     if (field === 'number') {
-      valueA = a.number || '';
-      valueB = b.number || '';
+      valueA = String(a.number || '');
+      valueB = String(b.number || '');
       const compare = valueA.localeCompare(valueB);
       return direction === 'asc' ? compare : -compare;
     }
@@ -152,6 +191,91 @@ function buildSummary(list) {
   };
 }
 
+/* =========================================================
+   AUXILIARY LOOKUPS
+========================================================= */
+
+function getProductsList() {
+  return (getProducts() || []).map(normalizeProduct);
+}
+
+function getWarehousesList() {
+  return (getWarehouses() || []).map(normalizeWarehouse);
+}
+
+function findProductById(productId) {
+  return getProductsList().find((product) => product.id === productId) || null;
+}
+
+function findWarehouseById(warehouseId) {
+  return getWarehousesList().find((warehouse) => warehouse.id === warehouseId) || null;
+}
+
+function findWarehouseByName(name) {
+  return (
+    getWarehousesList().find(
+      (warehouse) => normalizeText(warehouse.name) === normalizeText(name)
+    ) || null
+  );
+}
+
+function normalizeDocumentType(type) {
+  const lookup = normalizeText(type);
+
+  if (
+    lookup === 'transferência' ||
+    lookup === 'transferencia' ||
+    lookup === 'transfer'
+  ) {
+    return 'Transferência';
+  }
+
+  if (
+    lookup === 'ajuste' ||
+    lookup === 'entrada' ||
+    lookup === 'adjustment'
+  ) {
+    return 'Ajuste';
+  }
+
+  return type || 'Transferência';
+}
+
+function resolveWarehouseName(value) {
+  if (!value) return '';
+
+  const byId = findWarehouseById(value);
+  if (byId) return byId.name;
+
+  const byName = findWarehouseByName(value);
+  if (byName) return byName.name;
+
+  return String(value).trim();
+}
+
+function normalizePayloadLine(line = {}) {
+  let productId = line.product_id || '';
+  let item = line.item || '';
+
+  if (productId) {
+    const product = findProductById(productId);
+    if (product) {
+      item = product.name || item;
+    }
+  }
+
+  return {
+    product_id: productId,
+    item,
+    quantity: Number(line.quantity || 0),
+    unitPrice: Number(line.unitPrice || 0),
+  };
+}
+
+/* =========================================================
+   READ APIS
+========================================================= */
+
 export function listDocuments(options = {}) {
   const {
     filters = {},
@@ -183,6 +307,7 @@ export function getDocumentsList(options = {}) {
     filters: {
       query: options.query || '',
       status: options.status || 'all',
+      type: options.type || 'all',
     },
     sort: {
       field: options.sortBy?.startsWith('number') ? 'number' : 'date',
@@ -215,40 +340,48 @@ export function getDocument(documentId) {
   return normalizeDocument(getDocumentById(documentId));
 }
 
+export function getDocumentService(documentId) {
+  return getDocument(documentId);
+}
+
+export function getProductsService() {
+  return getProductsList();
+}
+
+export function getWarehousesService() {
+  return getWarehousesList();
+}
+
 export function getDocumentFormOptions() {
   return {
-    products: (getProducts() || []).map((product) => ({
-      id: product.id,
-      name: product.name || '',
-      sku: product.sku || '',
-      label: product.sku
-        ? `${product.name} (${product.sku})`
-        : product.name || product.id,
-    })),
-    warehouses: (getWarehouses() || []).map((warehouse) => ({
-      id: warehouse.id,
-      name: warehouse.name || '',
-    })),
+    products: getProductsList(),
+    warehouses: getWarehousesList(),
     documentTypes: ['Transferência', 'Ajuste'],
   };
 }
 
+/* =========================================================
+   WRITE APIS
+========================================================= */
+
 export function createNewDocument(payload = {}) {
   const created = createDocument({
     date: payload.date || '',
-    type: payload.type || '',
-    origin: payload.origin || '',
-    destination: payload.destination || '',
+    type: normalizeDocumentType(payload.type),
+    origin: resolveWarehouseName(payload.origin),
+    destination: resolveWarehouseName(payload.destination),
   });
 
   const lines = Array.isArray(payload.lines) ? payload.lines : [];
 
   lines.forEach((line) => {
+    const normalizedLine = normalizePayloadLine(line);
+
     addDocumentLine(created.id, {
-      product_id: line.product_id || '',
-      item: line.item || '',
-      quantity: Number(line.quantity || 0),
-      unitPrice: Number(line.unitPrice || 0),
+      product_id: normalizedLine.product_id,
+      item: normalizedLine.item,
+      quantity: normalizedLine.quantity,
+      unitPrice: normalizedLine.unitPrice,
     });
   });
 
@@ -258,9 +391,9 @@ export function createNewDocument(payload = {}) {
 export function updateExistingDocument(documentId, payload = {}) {
   updateDocument(documentId, {
     date: payload.date || '',
-    type: payload.type || '',
-    origin: payload.origin || '',
-    destination: payload.destination || '',
+    type: normalizeDocumentType(payload.type),
+    origin: resolveWarehouseName(payload.origin),
+    destination: resolveWarehouseName(payload.destination),
   });
 
   const currentLines = getDocumentLines(documentId) || [];
@@ -271,36 +404,40 @@ export function updateExistingDocument(documentId, payload = {}) {
   });
 
   nextLines.forEach((line) => {
+    const normalizedLine = normalizePayloadLine(line);
+
     addDocumentLine(documentId, {
-      product_id: line.product_id || '',
-      item: line.item || '',
-      quantity: Number(line.quantity || 0),
-      unitPrice: Number(line.unitPrice || 0),
+      product_id: normalizedLine.product_id,
+      item: normalizedLine.item,
+      quantity: normalizedLine.quantity,
+      unitPrice: normalizedLine.unitPrice,
     });
   });
 
   return getDocument(documentId);
 }
 
+export function saveDocumentService(payload = {}) {
+  if (payload.id) {
+    return updateExistingDocument(payload.id, payload);
+  }
+
+  return createNewDocument(payload);
+}
+
+/* =========================================================
+   LINE APIS
+========================================================= */
+
 export function addDocumentLineService(documentId, lineData) {
   return normalizeLine(
-    addDocumentLine(documentId, {
-      product_id: lineData.product_id || '',
-      item: lineData.item || '',
-      quantity: Number(lineData.quantity || 0),
-      unitPrice: Number(lineData.unitPrice || 0),
-    })
+    addDocumentLine(documentId, normalizePayloadLine(lineData))
   );
 }
 
 export function updateDocumentLineService(documentId, lineId, lineData) {
   return normalizeLine(
-    updateDocumentLine(documentId, lineId, {
-      product_id: lineData.product_id || '',
-      item: lineData.item || '',
-      quantity: Number(lineData.quantity || 0),
-      unitPrice: Number(lineData.unitPrice || 0),
-    })
+    updateDocumentLine(documentId, lineId, normalizePayloadLine(lineData))
   );
 }
 
@@ -320,6 +457,10 @@ export function getDocumentTotalsService(documentId) {
     grandTotal: Number(totals.grandTotal || 0),
   };
 }
+
+/* =========================================================
+   BUSINESS ACTIONS
+========================================================= */
 
 export function postDocumentService(documentId) {
   return normalizeDocument(postDocument(documentId));
