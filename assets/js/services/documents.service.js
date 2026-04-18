@@ -29,34 +29,25 @@ function normalizeDocument(doc) {
 function applyFilters(list, filters = {}) {
   let result = [...list];
 
-  // SEARCH
   if (filters.query) {
     const q = filters.query.toLowerCase();
 
     result = result.filter((doc) =>
-      [
-        doc.number,
-        doc.type,
-        doc.origin,
-        doc.destination,
-      ]
+      [doc.number, doc.type, doc.origin, doc.destination]
         .join(' ')
         .toLowerCase()
         .includes(q)
     );
   }
 
-  // STATUS
   if (filters.status && filters.status !== 'all') {
     result = result.filter((d) => d.status === filters.status);
   }
 
-  // TYPE
   if (filters.type && filters.type !== 'all') {
     result = result.filter((d) => d.type === filters.type);
   }
 
-  // DATE RANGE
   if (filters.dateFrom) {
     result = result.filter((d) => new Date(d.date) >= new Date(filters.dateFrom));
   }
@@ -132,7 +123,6 @@ function buildSummary(list) {
    PUBLIC API
 ========================================================= */
 
-// LIST (PRO)
 export function listDocuments(options = {}) {
   const {
     filters = {},
@@ -156,7 +146,6 @@ export function listDocuments(options = {}) {
   };
 }
 
-// GET
 export function getDocument(documentId) {
   const doc = getDocumentById(documentId);
   if (!doc) return null;
@@ -164,35 +153,26 @@ export function getDocument(documentId) {
   return normalizeDocument(doc);
 }
 
-// CREATE
 export function createNewDocument(payload) {
-  const clean = {
+  return createDocument({
     ...payload,
     status: 'draft',
     lines: payload.lines || [],
-  };
-
-  return createDocument(clean);
+  });
 }
 
-// UPDATE
 export function updateExistingDocument(documentId, payload) {
   return updateDocument(documentId, payload);
 }
 
-// DELETE (optional)
 export function removeDocument(documentId) {
   return deleteDocument(documentId);
 }
 
-// POST
 export async function postDocumentService(documentId, userId = null) {
-  const res = await postDocument(documentId, userId);
-  return res;
+  return await postDocument(documentId, userId);
 }
 
-// CANCEL
 export async function cancelDocumentService(documentId, userId = null, reason = '') {
-  const res = await cancelDocument(documentId, userId, reason);
-  return res;
+  return await cancelDocument(documentId, userId, reason);
 }
