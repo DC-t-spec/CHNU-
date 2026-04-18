@@ -1,46 +1,23 @@
-import { executeDocumentPosting } from './documents.service.js';
+// assets/js/modules/documents/document-posting.js
+
+import { postDocumentService } from '../../services/documents.service.js';
 import { showConfirm } from '../../ui/confirm.js';
 import { showToast } from '../../ui/toast.js';
 
 export async function handleDocumentPosting(documentId, options = {}) {
-  const {
-    redirectTo = 'detail',
-    onSuccess = null,
-    userId = 'system',
-  } = options;
+  const { redirectTo = 'detail' } = options;
 
-  const confirmed = await showConfirm({
-    title: 'Postar documento',
-    message: 'Deseja postar este documento?',
-    confirmText: 'Sim, postar',
-    cancelText: 'Voltar',
-  });
+  const confirmed = await showConfirm('Deseja postar este documento?');
+  if (!confirmed) return false;
 
-  if (!confirmed) return;
+  await postDocumentService(documentId);
+  showToast('Documento postado com sucesso.');
 
-  try {
-    executeDocumentPosting(documentId, userId);
-
-    showToast({
-      message: 'Documento postado com sucesso.',
-      type: 'success',
-    });
-
-    if (typeof onSuccess === 'function') {
-      onSuccess();
-      return;
-    }
-
-    if (redirectTo === 'list') {
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
-      return;
-    }
-
-    window.location.hash = `#documents/view?id=${documentId}`;
-  } catch (error) {
-    showToast({
-      message: error.message || 'Erro ao postar documento.',
-      type: 'error',
-    });
+  if (redirectTo === 'list') {
+    window.location.hash = '#documents';
+    return true;
   }
+
+  window.location.hash = `#documents/view?id=${documentId}`;
+  return true;
 }
