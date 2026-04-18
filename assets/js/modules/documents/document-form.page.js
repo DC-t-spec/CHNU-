@@ -16,11 +16,40 @@ export async function renderDocumentFormPage(context = {}) {
   const warehouses = getWarehousesService();
   const existing = documentId ? getDocumentService(documentId) : null;
 
+  if (documentId && !existing) {
+    appRoot.innerHTML = `
+      <section class="page-shell">
+        <div class="card">
+          <h2>Documento não encontrado</h2>
+          <p>O documento solicitado não existe.</p>
+          <a href="#documents" class="btn btn-primary">Voltar</a>
+        </div>
+      </section>
+    `;
+    return;
+  }
+
+  if (existing && !existing.canEdit) {
+    appRoot.innerHTML = `
+      <section class="page-shell">
+        <div class="card">
+          <h2>Edição bloqueada</h2>
+          <p>Apenas documentos em draft podem ser editados.</p>
+          <div class="page-actions">
+            <a href="#documents" class="btn btn-secondary">Voltar</a>
+            <a href="#documents/view?id=${existing.id}" class="btn btn-primary">Ver documento</a>
+          </div>
+        </div>
+      </section>
+    `;
+    return;
+  }
+
   let lines = existing?.lines?.length
-    ? existing.lines.map(l => ({
-        product_id: l.product_id || '',
-        quantity: l.quantity,
-        unitPrice: l.unitPrice,
+    ? existing.lines.map((line) => ({
+        product_id: line.product_id || '',
+        quantity: Number(line.quantity || 0),
+        unitPrice: Number(line.unitPrice || 0),
       }))
     : [{ product_id: '', quantity: 1, unitPrice: 0 }];
 
@@ -29,6 +58,7 @@ export async function renderDocumentFormPage(context = {}) {
       <div class="page-header">
         <div>
           <h1>${documentId ? 'Editar Documento' : 'Novo Documento'}</h1>
+          <p>Preenchimento operacional com validação antes de guardar.</p>
         </div>
 
         <div class="page-actions">
@@ -39,7 +69,6 @@ export async function renderDocumentFormPage(context = {}) {
 
       <div class="card">
         <div class="document-form-grid">
-
           <div class="form-group">
             <label>Data</label>
             <input type="date" id="doc-date" value="${existing?.date || ''}" />
@@ -56,24 +85,29 @@ export async function renderDocumentFormPage(context = {}) {
           <div class="form-group">
             <label>Origem</label>
             <select id="doc-origin">
-              ${warehouses.map(w => `<option value="${w.id}">${w.name}</option>`).join('')}
+              <option value="">Selecionar</option>
+              ${warehouses.map((warehouse) => `
+                <option value="${warehouse.id}">${warehouse.name}</option>
+              `).join('')}
             </select>
           </div>
 
           <div class="form-group">
             <label>Destino</label>
             <select id="doc-destination">
-              ${warehouses.map(w => `<option value="${w.id}">${w.name}</option>`).join('')}
+              <option value="">Selecionar</option>
+              ${warehouses.map((warehouse) => `
+                <option value="${warehouse.id}">${warehouse.name}</option>
+              `).join('')}
             </select>
           </div>
-
         </div>
       </div>
 
       <div class="card">
         <div class="document-form__section-header">
           <h3>Linhas</h3>
-          <button class="btn btn-secondary" id="add-line">+ Linha</button>
+          <button class="btn btn-secondary" id="add-line" type="button">+ Linha</button>
         </div>
 
         <div id="lines-container"></div>
@@ -91,40 +125,43 @@ export async function renderDocumentFormPage(context = {}) {
   setInitialValues();
   renderLines();
   bindEvents();
+  syncTypeRules();
 
   function setInitialValues() {
     if (!existing) return;
 
     document.getElementById('doc-type').value = existing.type || 'Transferência';
 
-    const origin = warehouses.find(w => w.name === existing.origin);
-    const destination = warehouses.find(w => w.name === existing.destination);
+    const origin = warehouses.find((warehouse) => warehouse.name === existing.origin);
+    const destination = warehouses.find((warehouse) => warehouse.name === existing.destination);
 
-    if (origin) document.getElementById('doc-origin').value = origin.id;
-    if (destination) document.getElementById('doc-destination').value = destination.id;
+    if (origin) {
+      document.getElementById('doc-origin').value = origin.id;
+    }
+
+    if (destination) {
+      document.getElementById('doc-destination').value = destination.id;
+    }
   }
 
   function renderLines() {
     const container = document.getElementById('lines-container');
 
     container.innerHTML = lines
-      .map((l, i) => `
-        <div class="document-line" data-index="${i}" style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;margin-bottom:10px;">
-          
+      .map((line, index) => `
+        <div class="document-line" data-index="${index}" style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;margin-bottom:10px;">
           <select class="line-product">
             <option value="">Produto</option>
-            ${products.map(p => `
-              <option value="${p.id}" ${p.id === l.product_id ? 'selected' : ''}>
-                ${p.label}
+            ${products.map((product) => `
+              <option value="${product.id}" ${product.id === line.product_id ? 'selected' : ''}>
+                ${product.label}
               </option>
             `).join('')}
           </select>
 
-          <input type="number" class="line-qty" value="${l.quantity}" min="0"/>
-
-          <input type="number" class="line-price" value="${l.unitPrice}" min="0"/>
-
-          <button class="btn btn-danger remove-line">X</button>
+          <input type="number" class="line-qty" value="${line.quantity}" min="0" step="0.01" />
+          <input type="number" class="line-price" value="${line.unitPrice}" min="0" step="0.01" />
+          <button class="btn btn-danger remove-line" type="button">X</button>
         </div>
       `)
       .join('');
@@ -138,35 +175,80 @@ export async function renderDocumentFormPage(context = {}) {
       renderLines();
     };
 
-    document.getElementById('lines-container').addEventListener('input', (e) => {
-      const row = e.target.closest('.document-line');
+    document.getElementById('doc-type').addEventListener('change', syncTypeRules);
+
+    document.getElementById('lines-container').addEventListener('input', (event) => {
+      const row = event.target.closest('.document-line');
       if (!row) return;
 
-      const i = Number(row.dataset.index);
+      const index = Number(row.dataset.index);
 
-      lines[i].product_id = row.querySelector('.line-product').value;
-      lines[i].quantity = Number(row.querySelector('.line-qty').value);
-      lines[i].unitPrice = Number(row.querySelector('.line-price').value);
+      lines[index].product_id = row.querySelector('.line-product').value;
+      lines[index].quantity = Number(row.querySelector('.line-qty').value);
+      lines[index].unitPrice = Number(row.querySelector('.line-price').value);
 
       updateTotal();
     });
 
-    document.getElementById('lines-container').addEventListener('click', (e) => {
-      if (!e.target.classList.contains('remove-line')) return;
+    document.getElementById('lines-container').addEventListener('click', (event) => {
+      if (!event.target.classList.contains('remove-line')) return;
 
-      const row = e.target.closest('.document-line');
-      const i = Number(row.dataset.index);
+      const row = event.target.closest('.document-line');
+      const index = Number(row.dataset.index);
 
-      lines.splice(i, 1);
+      lines.splice(index, 1);
       renderLines();
     });
 
     document.getElementById('save-document').onclick = handleSave;
   }
 
+  function syncTypeRules() {
+    const type = document.getElementById('doc-type').value;
+    const originSelect = document.getElementById('doc-origin');
+
+    if (type === 'Ajuste') {
+      originSelect.value = '';
+      originSelect.disabled = true;
+      return;
+    }
+
+    originSelect.disabled = false;
+  }
+
   function updateTotal() {
-    const total = lines.reduce((sum, l) => sum + (l.quantity * l.unitPrice), 0);
+    const total = lines.reduce((sum, line) => {
+      return sum + Number(line.quantity || 0) * Number(line.unitPrice || 0);
+    }, 0);
+
     document.getElementById('doc-total').textContent = total.toFixed(2);
+  }
+
+  function validateBeforeSave(data) {
+    if (!data.date) return 'Data obrigatória.';
+    if (!data.type) return 'Tipo obrigatório.';
+
+    if (data.type === 'Transferência') {
+      if (!data.origin) return 'Origem obrigatória.';
+      if (!data.destination) return 'Destino obrigatório.';
+      if (data.origin === data.destination) return 'Origem e destino não podem ser iguais.';
+    }
+
+    if (data.type === 'Ajuste') {
+      if (!data.destination) return 'Destino obrigatório.';
+    }
+
+    if (!data.lines.length) return 'Adicione pelo menos uma linha.';
+
+    for (let index = 0; index < data.lines.length; index += 1) {
+      const line = data.lines[index];
+
+      if (!line.product_id) return `Linha ${index + 1}: selecione produto.`;
+      if (Number(line.quantity || 0) <= 0) return `Linha ${index + 1}: quantidade inválida.`;
+      if (Number(line.unitPrice || 0) < 0) return `Linha ${index + 1}: preço inválido.`;
+    }
+
+    return null;
   }
 
   function handleSave() {
@@ -179,36 +261,21 @@ export async function renderDocumentFormPage(context = {}) {
       lines,
     };
 
-    const error = validate(payload);
+    const validationError = validateBeforeSave(payload);
 
-    if (error) {
-      showToast(error, 'error');
+    if (validationError) {
+      showToast(validationError, 'error');
       return;
     }
 
-    saveDocumentService(payload);
+    try {
+      const saved = saveDocumentService(payload);
 
-    showToast('Documento guardado com sucesso.', 'success');
-
-    window.location.hash = '#documents';
-  }
-
-  function validate(data) {
-    if (!data.date) return 'Data obrigatória';
-    if (!data.origin) return 'Origem obrigatória';
-    if (!data.destination) return 'Destino obrigatório';
-    if (data.origin === data.destination) return 'Origem e destino não podem ser iguais';
-
-    if (!data.lines.length) return 'Adicione pelo menos uma linha';
-
-    for (let i = 0; i < data.lines.length; i++) {
-      const l = data.lines[i];
-
-      if (!l.product_id) return `Linha ${i + 1}: selecione produto`;
-      if (l.quantity <= 0) return `Linha ${i + 1}: quantidade inválida`;
-      if (l.unitPrice < 0) return `Linha ${i + 1}: preço inválido`;
+      showToast('Documento guardado com sucesso.', 'success');
+      window.location.hash = `#documents/view?id=${saved.id}`;
+    } catch (error) {
+      console.error(error);
+      showToast(error?.message || 'Erro ao guardar documento.', 'error');
     }
-
-    return null;
   }
 }
