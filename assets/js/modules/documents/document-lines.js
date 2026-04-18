@@ -1,249 +1,194 @@
-import { getProducts } from '../../core/state.js';
-import {
- 
-  updateLineInDocument,
-  removeLineFromDocument,
-  getDocumentDetails,
-} from './documents.service.js';
+// assets/js/modules/documents/document-lines.js
 
-function renderProductOptions(selectedValue = '') {
-  const products = getProducts() || [];
+export function initDocumentLines({
+  containerSelector = '#document-lines',
+  addButtonSelector = '#add-line-btn',
+  products = [],
+  warehouses = [],
+  initialLines = [],
+  onChange = () => {},
+} = {}) {
+  const container = document.querySelector(containerSelector);
+  const addBtn = document.querySelector(addButtonSelector);
 
-  return `
-    <option value="">Selecionar produto</option>
-    ${products
-      .map((product) => {
-        const selected = product.id === selectedValue ? 'selected' : '';
-        return `
-          <option value="${product.id}" ${selected}>
-            ${product.name} (${product.sku || 'Sem SKU'})
-          </option>
-        `;
-      })
-      .join('')}
-  `;
-}
+  if (!container) return;
 
-export function renderDocumentLinesSection(document) {
-  const isEditable = document.canEdit;
+  let lines = initialLines.length ? [...initialLines] : [createEmptyLine()];
 
-  return `
-    <div class="card">
-      <div class="section-header">
-        <div>
-          <h2>Linhas do documento</h2>
-          <p>Itens operacionais associados ao documento</p>
-        </div>
-      </div>
-
-      ${isEditable ? renderLineForm(document.id) : ''}
-
-      ${renderLinesTable(document)}
-      ${renderLinesTotals(document)}
-    </div>
-  `;
-}
-
-export function bindDocumentLinesEvents(documentId) {
-  const addForm = document.querySelector('#document-line-form');
-
-  if (addForm) {
-    addForm.addEventListener('submit', (event) => {
-      handleAddLine(event, documentId);
-    });
+  function createEmptyLine() {
+    return {
+      id: crypto.randomUUID(),
+      product_id: '',
+      warehouse_id: '',
+      quantity: 0,
+      unitPrice: 0,
+      total: 0,
+    };
   }
 
-  const table = document.querySelector('#document-lines-table');
-
-  if (table) {
-    table.addEventListener('click', (event) => {
-      handleLineTableClick(event, documentId);
-    });
+  function recalcLine(line) {
+    line.quantity = Number(line.quantity || 0);
+    line.unitPrice = Number(line.unitPrice || 0);
+    line.total = line.quantity * line.unitPrice;
   }
-}
 
-function renderLineForm(documentId) {
-  return `
-    <form id="document-line-form" class="line-form">
-      <div class="line-form__grid">
-        <div class="form-field">
-          <label>Item</label>
-          <select name="product_id" required>
-            ${renderProductOptions()}
-          </select>
-        </div>
+  function recalcAll() {
+    lines.forEach(recalcLine);
+  }
 
-        <div class="form-field">
-          <label>Quantidade</label>
-          <input name="quantity" type="number" min="0.01" step="0.01" required />
-        </div>
+  function getProductOptions(selected) {
+    return products
+      .map(
+        (p) => `
+        <option value="${p.id}" ${p.id === selected ? 'selected' : ''}>
+          ${p.name}
+        </option>
+      `
+      )
+      .join('');
+  }
 
-        <div class="form-field">
-          <label>Preço unitário</label>
-          <input name="unitPrice" type="number" min="0" step="0.01" required />
-        </div>
+  function getWarehouseOptions(selected) {
+    return warehouses
+      .map(
+        (w) => `
+        <option value="${w.id}" ${w.id === selected ? 'selected' : ''}>
+          ${w.name}
+        </option>
+      `
+      )
+      .join('');
+  }
 
-        <div class="line-form__actions">
-          <button type="submit" class="btn btn-primary">
-            Adicionar linha
-          </button>
-        </div>
+  function render() {
+    recalcAll();
+
+    container.innerHTML = `
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Produto</th>
+              <th>Armazém</th>
+              <th>Qtd</th>
+              <th>Preço</th>
+              <th>Total</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${lines
+              .map(
+                (line) => `
+                  <tr data-id="${line.id}">
+                    <td>
+                      <select class="line-product">
+                        <option value="">Selecionar</option>
+                        ${getProductOptions(line.product_id)}
+                      </select>
+                    </td>
+
+                    <td>
+                      <select class="line-warehouse">
+                        <option value="">Selecionar</option>
+                        ${getWarehouseOptions(line.warehouse_id)}
+                      </select>
+                    </td>
+
+                    <td>
+                      <input type="number" class="line-qty" value="${line.quantity}" min="0" />
+                    </td>
+
+                    <td>
+                      <input type="number" class="line-price" value="${line.unitPrice}" min="0" step="0.01" />
+                    </td>
+
+                    <td>
+                      <strong>${formatCurrency(line.total)}</strong>
+                    </td>
+
+                    <td>
+                      <button class="btn btn-danger btn-sm remove-line">✕</button>
+                    </td>
+                  </tr>
+                `
+              )
+              .join('')}
+          </tbody>
+        </table>
       </div>
-    </form>
-  `;
-}
+    `;
 
-function renderLinesTable(documentData) {
-  const lines = documentData.lines || [];
+    bindEvents();
+    emitChange();
+  }
 
-  return `
-    <div class="table-responsive">
-      <table class="data-table" id="document-lines-table">
-        <thead>
-          <tr>
-            <th>Item</th>
-            <th>Quantidade</th>
-            <th>Preço unitário</th>
-            <th>Total</th>
-            <th>Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${
-            lines.length
-              ? lines.map((line) => `
-                <tr>
-                  <td>${escapeHtml(line.item)}</td>
-                  <td>${formatNumber(line.quantity)}</td>
-                  <td>${formatCurrency(line.unitPrice)}</td>
-                  <td>${formatCurrency(line.total)}</td>
-                  <td>
-                    ${
-                      documentData.canEdit
-                        ? `
-                          <div class="table-actions">
-                            <button class="btn btn-sm btn-secondary" data-action="edit" data-id="${line.id}">
-                              Editar
-                            </button>
-                            <button class="btn btn-sm btn-danger" data-action="remove" data-id="${line.id}">
-                              Remover
-                            </button>
-                          </div>
-                        `
-                        : `<span class="table-muted-text">Sem ações</span>`
-                    }
-                  </td>
-                </tr>
-              `).join('')
-              : `
-                <tr>
-                  <td colspan="5" class="empty-state-cell">
-                    Nenhuma linha adicionada.
-                  </td>
-                </tr>
-              `
-          }
-        </tbody>
-      </table>
-    </div>
-  `;
-}
+  function bindEvents() {
+    container.querySelectorAll('tr[data-id]').forEach((row) => {
+      const id = row.dataset.id;
+      const line = lines.find((l) => l.id === id);
 
-function renderLinesTotals(documentData) {
-  const totals = documentData.totals || {
-    linesCount: 0,
-    grandTotal: 0,
+      row.querySelector('.line-product').onchange = (e) => {
+        line.product_id = e.target.value;
+        emitChange();
+      };
+
+      row.querySelector('.line-warehouse').onchange = (e) => {
+        line.warehouse_id = e.target.value;
+        emitChange();
+      };
+
+      row.querySelector('.line-qty').oninput = (e) => {
+        line.quantity = Number(e.target.value || 0);
+        render();
+      };
+
+      row.querySelector('.line-price').oninput = (e) => {
+        line.unitPrice = Number(e.target.value || 0);
+        render();
+      };
+
+      row.querySelector('.remove-line').onclick = () => {
+        if (lines.length === 1) return;
+        lines = lines.filter((l) => l.id !== id);
+        render();
+      };
+    });
+
+    if (addBtn) {
+      addBtn.onclick = () => {
+        lines.push(createEmptyLine());
+        render();
+      };
+    }
+  }
+
+  function emitChange() {
+    recalcAll();
+
+    const summary = {
+      lines: lines.map((l) => ({ ...l })),
+      linesCount: lines.length,
+      grandTotal: lines.reduce((sum, l) => sum + l.total, 0),
+    };
+
+    onChange(summary);
+  }
+
+  render();
+
+  return {
+    getLines: () => lines,
+    setLines: (newLines = []) => {
+      lines = newLines.length ? [...newLines] : [createEmptyLine()];
+      render();
+    },
   };
-
-  return `
-    <div class="document-totals">
-      <div class="document-totals__item">
-        <span>Total de linhas</span>
-        <strong>${totals.linesCount}</strong>
-      </div>
-
-      <div class="document-totals__item document-totals__item--highlight">
-        <span>Total geral</span>
-        <strong>${formatCurrency(totals.grandTotal)}</strong>
-      </div>
-    </div>
-  `;
-}
-
-function handleAddLine(event, documentId) {
-  event.preventDefault();
-
-  const formData = new FormData(event.currentTarget);
-  const products = getProducts() || [];
-
-  const productId = formData.get('product_id');
-  const product = products.find((p) => p.id === productId);
-
-  const payload = {
-    product_id: productId,
-    item: product?.name || '',
-    quantity: Number(formData.get('quantity')),
-    unitPrice: Number(formData.get('unitPrice')),
-  };
-
-  try {
-    addLineToDocument(documentId, payload);
-    window.location.hash = `#documents/edit?id=${documentId}`;
-  } catch (error) {
-    alert(error.message);
-  }
-}
-
-function handleLineTableClick(event, documentId) {
-  const btn = event.target.closest('[data-action]');
-  if (!btn) return;
-
-  const action = btn.dataset.action;
-  const lineId = btn.dataset.id;
-
-  if (action === 'remove') {
-    removeLineFromDocument(documentId, lineId);
-    window.location.hash = `#documents/edit?id=${documentId}`;
-  }
-
-  if (action === 'edit') {
-    openEditPrompt(documentId, lineId);
-  }
-}
-
-function openEditPrompt(documentId, lineId) {
-  const doc = getDocumentDetails(documentId);
-  const line = doc.lines.find((l) => l.id === lineId);
-  if (!line) return;
-
-  const quantity = Number(prompt('Quantidade:', line.quantity));
-  const unitPrice = Number(prompt('Preço unitário:', line.unitPrice));
-
-  try {
-    updateLineInDocument(documentId, lineId, {
-      quantity,
-      unitPrice,
-    });
-
-    window.location.hash = `#documents/edit?id=${documentId}`;
-  } catch (error) {
-    alert(error.message);
-  }
 }
 
 function formatCurrency(value) {
-  return `${(Number(value) || 0).toLocaleString('pt-PT', {
+  return Number(value || 0).toLocaleString('pt-PT', {
     minimumFractionDigits: 2,
-  })} MT`;
-}
-
-function formatNumber(value) {
-  return Number(value || 0).toLocaleString('pt-PT');
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;');
+    maximumFractionDigits: 2,
+  });
 }
