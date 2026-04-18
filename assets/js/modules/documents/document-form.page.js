@@ -6,6 +6,7 @@ import {
   getProductsService,
   getWarehousesService,
 } from '../../services/documents.service.js';
+import { showToast } from '../../ui/toast.js';
 
 export async function renderDocumentFormPage(context = {}) {
   const appRoot = document.querySelector('#app');
@@ -119,9 +120,9 @@ export async function renderDocumentFormPage(context = {}) {
             `).join('')}
           </select>
 
-          <input type="number" class="line-qty" value="${l.quantity}" />
+          <input type="number" class="line-qty" value="${l.quantity}" min="0"/>
 
-          <input type="number" class="line-price" value="${l.unitPrice}" />
+          <input type="number" class="line-price" value="${l.unitPrice}" min="0"/>
 
           <button class="btn btn-danger remove-line">X</button>
         </div>
@@ -178,8 +179,36 @@ export async function renderDocumentFormPage(context = {}) {
       lines,
     };
 
+    const error = validate(payload);
+
+    if (error) {
+      showToast(error, 'error');
+      return;
+    }
+
     saveDocumentService(payload);
 
+    showToast('Documento guardado com sucesso.', 'success');
+
     window.location.hash = '#documents';
+  }
+
+  function validate(data) {
+    if (!data.date) return 'Data obrigatória';
+    if (!data.origin) return 'Origem obrigatória';
+    if (!data.destination) return 'Destino obrigatório';
+    if (data.origin === data.destination) return 'Origem e destino não podem ser iguais';
+
+    if (!data.lines.length) return 'Adicione pelo menos uma linha';
+
+    for (let i = 0; i < data.lines.length; i++) {
+      const l = data.lines[i];
+
+      if (!l.product_id) return `Linha ${i + 1}: selecione produto`;
+      if (l.quantity <= 0) return `Linha ${i + 1}: quantidade inválida`;
+      if (l.unitPrice < 0) return `Linha ${i + 1}: preço inválido`;
+    }
+
+    return null;
   }
 }
