@@ -1,8 +1,22 @@
 import * as state from '../core/state.js';
 
-function callState(methodNames, ...args) {
+function hasStateMethod(name) {
+  return typeof state[name] === 'function';
+}
+
+function callStateStrict(methodNames, ...args) {
   for (const name of methodNames) {
-    if (typeof state[name] === 'function') {
+    if (hasStateMethod(name)) {
+      return state[name](...args);
+    }
+  }
+
+  throw new Error(`Método do state não encontrado: ${methodNames.join(' | ')}`);
+}
+
+function callStateLoose(methodNames, ...args) {
+  for (const name of methodNames) {
+    if (hasStateMethod(name)) {
       return state[name](...args);
     }
   }
@@ -74,10 +88,23 @@ function normalizeDocument(doc = {}) {
   };
 }
 
+function getWarehousesInternal() {
+  const result = callStateLoose(
+    ['getWarehouses', 'listWarehouses', 'getLocations', 'getWarehousesService'],
+    {}
+  ) ?? [];
+
+  return (Array.isArray(result) ? result : []).map((warehouse, index) => ({
+    id: warehouse.id ?? `warehouse-${index + 1}`,
+    code: warehouse.code ?? '',
+    name: warehouse.name ?? warehouse.label ?? `Armazém ${index + 1}`,
+  }));
+}
+
 function mapWarehouseName(value) {
   if (!value) return '';
 
-  const warehouse = getWarehouses().find(
+  const warehouse = getWarehousesInternal().find(
     (item) => item.id === value || item.name === value
   );
 
@@ -121,10 +148,35 @@ function buildDocumentPayload(values = {}) {
 =============================== */
 
 export function listDocuments(filters = {}) {
-  const result =
-    callState(['searchDocuments', 'getDocuments'], filters) ?? [];
+  const result = callStateLoose(
+    ['searchDocuments', 'getDocuments', 'listDocuments'],
+    filters
+  ) ?? [];
 
-  return (Array.isArray(result) ? result : []).map(normalizeDocument);
+  const docs = (Array.isArray(result) ? result : []).map(normalizeDocument);
+
+  const query = String(filters.query ?? '').trim().toLowerCase();
+  const status = filters.status ?? null;
+
+  return docs.filter((doc) => {
+    const matchStatus = status ? doc.status === status : true;
+
+    const matchQuery = query
+      ? [
+          doc.number,
+          doc.type,
+          doc.reference,
+          doc.origin,
+          doc.destination,
+          doc.notes,
+        ]
+          .join(' ')
+          .toLowerCase()
+          .includes(query)
+      : true;
+
+    return matchStatus && matchQuery;
+  });
 }
 
 export function getDocumentsCounters() {
@@ -141,8 +193,10 @@ export function getDocumentsCounters() {
 export function getDocumentById(documentId) {
   if (!documentId) return null;
 
-  const direct =
-    callState(['getDocumentById', 'findDocumentById', 'getDocument'], documentId);
+  const direct = callStateLoose(
+    ['getDocumentById', 'findDocumentById', 'getDocument', 'getDocumentService'],
+    documentId
+  );
 
   if (direct) return normalizeDocument(direct);
 
@@ -152,14 +206,33 @@ export function getDocumentById(documentId) {
 
 export function createDocument(values = {}) {
   const payload = buildDocumentPayload(values);
-  const created = callState(['createDocument', 'addDocument'], payload);
-  return created ? normalizeDocument(created) : normalizeDocument(payload);
+
+  const created = callStateStrict(
+    ['createDocument', 'addDocument', 'saveDocumentService', 'saveDocument'],
+    payload
+  );
+
+  if (!created || !created.id) {
+    throw new Error('O documento não foi gravado no state.');
+  }
+
+  return normalizeDocument(created);
 }
 
 export function updateDocument(documentId, values = {}) {
   const payload = buildDocumentPayload({ ...values, id: documentId });
-  const updated = callState(['updateDocument', 'editDocument'], documentId, payload);
-  return updated ? normalizeDocument(updated) : normalizeDocument(payload);
+
+  const updated = callStateStrict(
+    ['updateDocument', 'editDocument', 'saveDocumentService', 'saveDocument'],
+    documentId,
+    payload
+  );
+
+  if (!updated || !updated.id) {
+    throw new Error('O documento não foi actualizado no state.');
+  }
+
+  return normalizeDocument(updated);
 }
 
 export function saveDocument(values = {}) {
@@ -171,11 +244,11 @@ export function saveDocument(values = {}) {
 }
 
 export function postDocumentById(documentId) {
-  return callState(['postDocument'], documentId);
+  return callStateStrict(['postDocument'], documentId);
 }
 
 export function cancelDocumentById(documentId, reason) {
-  return callState(['cancelDocument'], documentId, reason);
+  return callStateStrict(['cancelDocument'], documentId, reason);
 }
 
 /* ===============================
@@ -183,8 +256,10 @@ export function cancelDocumentById(documentId, reason) {
 =============================== */
 
 export function getProducts() {
-  const result =
-    callState(['getProducts', 'listProducts', 'getInventoryProducts'], {}) ?? [];
+  const result = callStateLoose(
+    ['getProducts', 'listProducts', 'getInventoryProducts', 'getProductsService'],
+    {}
+  ) ?? [];
 
   return (Array.isArray(result) ? result : []).map((product, index) => ({
     id: product.id ?? `product-${index + 1}`,
@@ -199,12 +274,5 @@ export function getProducts() {
 =============================== */
 
 export function getWarehouses() {
-  const result =
-    callState(['getWarehouses', 'listWarehouses', 'getLocations'], {}) ?? [];
-
-  return (Array.isArray(result) ? result : []).map((warehouse, index) => ({
-    id: warehouse.id ?? `warehouse-${index + 1}`,
-    code: warehouse.code ?? '',
-    name: warehouse.name ?? warehouse.label ?? `Armazém ${index + 1}`,
-  }));
+  return getWarehousesInternal();
 }
