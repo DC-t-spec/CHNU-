@@ -236,11 +236,40 @@ export function updateDocument(documentId, values = {}) {
 }
 
 export function saveDocument(values = {}) {
-  if (values.id) {
-    return updateDocument(values.id, values);
+  const payload = buildDocumentPayload(values);
+
+  let document;
+
+  if (payload.id) {
+    document = callStateStrict(
+      ['updateDocument'],
+      payload.id,
+      payload
+    );
+
+    // limpar linhas antigas
+    document.lines = [];
+  } else {
+    document = callStateStrict(
+      ['createDocument'],
+      payload
+    );
   }
 
-  return createDocument(values);
+  // 🔥 AQUI ESTÁ O SEGREDO
+  payload.lines.forEach((line) => {
+    callStateStrict(
+      ['addDocumentLine'],
+      document.id,
+      {
+        product_id: line.product_id,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+      }
+    );
+  });
+
+  return normalizeDocument(document);
 }
 
 export function postDocumentById(documentId) {
