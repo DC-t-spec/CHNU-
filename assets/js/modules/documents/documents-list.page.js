@@ -1,195 +1,54 @@
-import {
-  listDocuments,
-  getDocumentsCounters,
-} from '../../services/documents.service.js';
-
-function getCurrentListFilters() {
-  const params = new URLSearchParams(window.location.hash.split('?')[1] || '');
-
-  return {
-    query: (params.get('query') || '').trim(),
-    status: (params.get('status') || 'all').trim(),
-  };
-}
-
-function updateHashFilters(filters = {}) {
-  const params = new URLSearchParams();
-
-  if (filters.query) params.set('query', filters.query);
-  if (filters.status && filters.status !== 'all') params.set('status', filters.status);
-
-  const queryString = params.toString();
-  window.location.hash = queryString ? `#documents?${queryString}` : '#documents';
-}
-
-function formatDate(value) {
-  if (!value) return '—';
-
-  try {
-    return new Intl.DateTimeFormat('pt-PT').format(new Date(value));
-  } catch {
-    return value;
-  }
-}
-
-function formatMoney(value) {
-  const num = Number(value || 0);
-  return num.toFixed(2);
-}
-
-function getStatusLabel(status) {
-  const labels = {
-    draft: 'Rascunho',
-    posted: 'Lançado',
-    cancelled: 'Cancelado',
-  };
-
-  return labels[status] || status || '—';
-}
-
-function getStatusOptions(currentStatus = 'all') {
-  const options = [
-    { value: 'all', label: 'Todos' },
-    { value: 'draft', label: 'Rascunhos' },
-    { value: 'posted', label: 'Lançados' },
-    { value: 'cancelled', label: 'Cancelados' },
-  ];
-
-  return options
-    .map(
-      (option) => `
-        <option value="${option.value}" ${option.value === currentStatus ? 'selected' : ''}>
-          ${option.label}
-        </option>
-      `
-    )
-    .join('');
-}
-
-function buildCountersHtml(counters) {
-  return `
-    <div class="stats-grid" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;">
-      <div class="card">
-        <div class="card-body">
-          <div class="stat-label">Total</div>
-          <div class="stat-value">${counters.total}</div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-body">
-          <div class="stat-label">Rascunhos</div>
-          <div class="stat-value">${counters.draft}</div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-body">
-          <div class="stat-label">Lançados</div>
-          <div class="stat-value">${counters.posted}</div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-body">
-          <div class="stat-label">Cancelados</div>
-          <div class="stat-value">${counters.cancelled}</div>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function buildRowsHtml(documents) {
-  if (!documents.length) {
-    return `
-      <tr>
-        <td colspan="9" style="text-align:center;">Nenhum documento encontrado.</td>
-      </tr>
-    `;
-  }
-
-  return documents
-    .map(
-      (doc) => `
-        <tr>
-          <td>${doc.number || '—'}</td>
-          <td>${doc.type || '—'}</td>
-          <td><span class="badge badge-${doc.status}">${getStatusLabel(doc.status)}</span></td>
-          <td>${formatDate(doc.date)}</td>
-          <td>${doc.origin || '—'}</td>
-          <td>${doc.destination || '—'}</td>
-          <td>${doc.linesCount ?? 0}</td>
-          <td>${formatMoney(doc.grandTotal)}</td>
-          <td>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <a class="btn btn-sm btn-secondary" href="#documents/view?id=${doc.id}">Ver</a>
-              ${
-                doc.status === 'draft'
-                  ? `<a class="btn btn-sm btn-ghost" href="#documents/edit?id=${doc.id}">Editar</a>`
-                  : ''
-              }
-            </div>
-          </td>
-        </tr>
-      `
-    )
-    .join('');
-}
+import { listDocuments, getDocumentsCounters } from '../../services/documents.service.js';
 
 export async function renderDocumentsListPage() {
   const app = document.querySelector('#app');
   if (!app) return;
 
-  const filters = getCurrentListFilters();
-
-  const documents = listDocuments({
-    query: filters.query || undefined,
-    status: filters.status === 'all' ? null : filters.status,
-  });
-
   const counters = getDocumentsCounters();
+  const documents = listDocuments(getFilters());
 
   app.innerHTML = `
     <section class="page-shell">
-      <div class="page-header" style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start;">
+
+      <!-- HEADER -->
+      <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;">
         <div>
           <h1>Documentos</h1>
-          <p>Consulta e gestão de documentos.</p>
+          <p>Gestão de documentos operacionais.</p>
         </div>
 
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <a class="btn btn-primary" href="#documents/new">Novo documento</a>
-        </div>
+        <a href="#documents/new" class="btn btn-primary">+ Novo Documento</a>
       </div>
 
-      ${buildCountersHtml(counters)}
+      <!-- CARDS -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:16px;">
+        ${renderCard('Total', counters.total)}
+        ${renderCard('Rascunhos', counters.draft)}
+        ${renderCard('Lançados', counters.posted)}
+        ${renderCard('Cancelados', counters.cancelled)}
+      </div>
 
+      <!-- FILTROS -->
       <div class="card" style="margin-top:16px;">
-        <div class="card-body">
-          <form id="documents-filters-form" style="display:grid;grid-template-columns:2fr 1fr auto;gap:12px;align-items:end;">
-            <label class="form-field">
-              <span>Pesquisar</span>
-              <input
-                type="text"
-                name="query"
-                placeholder="Número, origem, destino, referência..."
-                value="${filters.query}"
-              />
-            </label>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <input 
+            type="text" 
+            placeholder="Pesquisar..." 
+            id="search-input"
+            class="toolbar__input"
+            style="flex:1;"
+          />
 
-            <label class="form-field">
-              <span>Status</span>
-              <select name="status">
-                ${getStatusOptions(filters.status)}
-              </select>
-            </label>
-
-            <button type="submit" class="btn btn-secondary">Filtrar</button>
-          </form>
+          <select id="status-filter" class="toolbar__select">
+            <option value="">Todos</option>
+            <option value="draft">Rascunho</option>
+            <option value="posted">Lançado</option>
+            <option value="cancelled">Cancelado</option>
+          </select>
         </div>
       </div>
 
+      <!-- TABELA -->
       <div class="card" style="margin-top:16px;">
         <div class="table-responsive">
           <table class="table">
@@ -197,34 +56,139 @@ export async function renderDocumentsListPage() {
               <tr>
                 <th>Número</th>
                 <th>Tipo</th>
-                <th>Status</th>
-                <th>Data</th>
                 <th>Origem</th>
                 <th>Destino</th>
-                <th>Linhas</th>
+                <th>Data</th>
+                <th>Status</th>
                 <th>Total</th>
-                <th>Acções</th>
+                <th></th>
               </tr>
             </thead>
+
             <tbody>
-              ${buildRowsHtml(documents)}
+              ${
+                documents.length
+                  ? documents.map(renderRow).join('')
+                  : `
+                    <tr>
+                      <td colspan="8" style="text-align:center;">
+                        Sem documentos.
+                      </td>
+                    </tr>
+                  `
+              }
             </tbody>
           </table>
         </div>
       </div>
+
     </section>
   `;
 
-  const filtersForm = document.querySelector('#documents-filters-form');
+  bindEvents();
+}
 
-  filtersForm?.addEventListener('submit', (event) => {
-    event.preventDefault();
+/* ============================= */
 
-    const formData = new FormData(filtersForm);
+function renderCard(label, value) {
+  return `
+    <div class="card">
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <span style="font-size:12px;color:#888;">${label}</span>
+        <strong style="font-size:22px;">${value}</strong>
+      </div>
+    </div>
+  `;
+}
 
-    updateHashFilters({
-      query: String(formData.get('query') || '').trim(),
-      status: String(formData.get('status') || 'all').trim(),
-    });
-  });
+/* ============================= */
+
+function renderRow(doc) {
+  return `
+    <tr>
+      <td>${doc.number}</td>
+      <td>${doc.type}</td>
+      <td>${doc.origin || '—'}</td>
+      <td>${doc.destination || '—'}</td>
+      <td>${formatDate(doc.date)}</td>
+      <td>${renderStatus(doc.status)}</td>
+      <td>${formatMoney(doc.grandTotal)}</td>
+      <td>
+        <div style="display:flex;gap:6px;">
+          <a href="#documents/view?id=${doc.id}" class="btn btn-ghost btn-sm">Ver</a>
+
+          ${
+            doc.status === 'draft'
+              ? `<a href="#documents/edit?id=${doc.id}" class="btn btn-ghost btn-sm">Editar</a>`
+              : ''
+          }
+        </div>
+      </td>
+    </tr>
+  `;
+}
+
+/* ============================= */
+
+function renderStatus(status) {
+  const map = {
+    draft: 'Rascunho',
+    posted: 'Lançado',
+    cancelled: 'Cancelado',
+  };
+
+  return `<span class="badge badge-${status}">${map[status]}</span>`;
+}
+
+/* ============================= */
+
+function formatDate(value) {
+  if (!value) return '—';
+  return new Date(value).toLocaleDateString('pt-PT');
+}
+
+function formatMoney(value) {
+  return Number(value || 0).toFixed(2);
+}
+
+/* ============================= */
+
+function getFilters() {
+  return {
+    query: '',
+    status: '',
+  };
+}
+
+/* ============================= */
+
+function bindEvents() {
+  const searchInput = document.getElementById('search-input');
+  const statusFilter = document.getElementById('status-filter');
+
+  searchInput?.addEventListener('input', reload);
+  statusFilter?.addEventListener('change', reload);
+}
+
+function reload() {
+  const query = document.getElementById('search-input')?.value || '';
+  const status = document.getElementById('status-filter')?.value || '';
+
+  const app = document.querySelector('#app');
+
+  const documents = listDocuments({ query, status });
+
+  const tbody = app.querySelector('tbody');
+
+  if (!tbody) return;
+
+  tbody.innerHTML = documents.length
+    ? documents.map(renderRow).join('')
+    : `
+      <tr>
+        <td colspan="8" style="text-align:center;">
+          Sem resultados.
+        </td>
+      </tr>
+    `;
 }
