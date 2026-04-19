@@ -221,20 +221,28 @@ export async function renderDocumentFormPage(context = {}) {
     if (totalEl) totalEl.textContent = formatCurrency(summary.grandTotal || 0);
   }
 
-  function handleSave() {
-    const payload = {
-      id: documentId,
-      date: document.getElementById('doc-date')?.value || '',
-      type: document.getElementById('doc-type')?.value || '',
-      origin: document.getElementById('doc-origin')?.value || '',
-      destination: document.getElementById('doc-destination')?.value || '',
-      lines: linesController.getLines().map((line) => ({
-        product_id: line.product_id || '',
-        warehouse_id: line.warehouse_id || '',
-        quantity: Number(line.quantity || 0),
-        unitPrice: Number(line.unitPrice || 0),
-      })),
-    };
+function handleSave() {
+  const rawLines = linesController.getLines();
+
+  const cleanedLines = rawLines.filter(
+    (line) =>
+      line.product_id &&
+      Number(line.quantity) > 0
+  );
+
+  const payload = {
+    id: documentId,
+    date: document.getElementById('doc-date')?.value || '',
+    type: document.getElementById('doc-type')?.value || '',
+    origin: document.getElementById('doc-origin')?.value || '',
+    destination: document.getElementById('doc-destination')?.value || '',
+    lines: cleanedLines.map((line) => ({
+      product_id: line.product_id,
+      warehouse_id: line.warehouse_id || '',
+      quantity: Number(line.quantity),
+      unitPrice: Number(line.unitPrice || 0),
+    })),
+  };
 
     const validationError = validateBeforeSave(payload);
 
