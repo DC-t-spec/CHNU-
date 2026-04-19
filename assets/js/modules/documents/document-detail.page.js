@@ -164,16 +164,46 @@ export async function renderDocumentDetailPage() {
 
   const postBtn = document.querySelector('.js-post-document');
   const cancelBtn = document.querySelector('.js-cancel-document');
+import { showToast } from '../../ui/toast.js';
 
-  if (postBtn) {
-    postBtn.addEventListener('click', () => {
-      handleDocumentPosting(documentData.id);
-    });
-  }
+if (postBtn) {
+  postBtn.addEventListener('click', async () => {
+    try {
+      await handleDocumentPosting(documentData.id);
 
-  if (cancelBtn) {
-    cancelBtn.addEventListener('click', () => {
-      handleDocumentCancel(documentData.id);
-    });
-  }
+      showToast({
+        type: 'success',
+        message: 'Documento lançado com sucesso.',
+      });
+
+      window.location.reload();
+    } catch (err) {
+      showToast({
+        type: 'error',
+        message: err.message || 'Erro ao lançar documento.',
+      });
+    }
+  });
+}
+
+if (cancelBtn) {
+  cancelBtn.addEventListener('click', async () => {
+    try {
+      await handleDocumentCancel(documentData.id);
+
+      showToast({
+        type: 'success',
+        message: 'Documento cancelado.',
+      });
+
+      window.location.reload();
+    } catch (err) {
+      showToast({
+        type: 'error',
+        message: err.message || 'Erro ao cancelar documento.',
+      });
+    }
+  });
+}
+
 }
