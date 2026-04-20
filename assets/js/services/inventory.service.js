@@ -23,7 +23,7 @@ export async function syncInventoryProducts() {
 }
 
 function getInventoryProductsCatalog() {
-  if (Array.isArray(productsCatalogCache) && productsCatalogCache.length) {
+  if (Array.isArray(productsCatalogCache)) {
     return productsCatalogCache;
   }
 

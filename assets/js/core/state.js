@@ -1,37 +1,12 @@
 import { normalizeDocumentType, DOCUMENT_TYPE_META } from '../services/document-engine.helper.js';
 
 const state = {
-  products: [
-    { id: 'p1', name: 'Produto A', sku: 'SKU-A' },
-    { id: 'p2', name: 'Produto B', sku: 'SKU-B' },
-    { id: 'p3', name: 'Produto C', sku: 'SKU-C' },
-    { id: 'p4', name: 'TV RCD', sku: 'tvrcd' },
-  ],
-  warehouses: [
-    { id: 'w1', name: 'Armazém Central' },
-    { id: 'w2', name: 'Loja 1' },
-    { id: 'w3', name: 'Stock Interno' },
-  ],
-  customers: [
-    { id: 'c1', code: 'CLI-001', name: 'Cliente Alpha' },
-    { id: 'c2', code: 'CLI-002', name: 'Cliente Beta' },
-    { id: 'c3', code: 'CLI-003', name: 'Cliente Gamma' },
-  ],
-  suppliers: [
-    { id: 's1', code: 'FOR-001', name: 'Fornecedor Atlas' },
-    { id: 's2', code: 'FOR-002', name: 'Fornecedor Orion' },
-    { id: 's3', code: 'FOR-003', name: 'Fornecedor Nobre' },
-  ],
-  stockBalances: [
-    { id: 'sb1', product_id: 'p1', warehouse_id: 'w1', qty_on_hand: 12, qty_reserved: 2, qty_available: 10, avg_unit_cost: 1500, total_cost: 18000 },
-    { id: 'sb2', product_id: 'p2', warehouse_id: 'w1', qty_on_hand: 8, qty_reserved: 1, qty_available: 7, avg_unit_cost: 2500, total_cost: 20000 },
-    { id: 'sb3', product_id: 'p3', warehouse_id: 'w3', qty_on_hand: 3, qty_reserved: 0, qty_available: 3, avg_unit_cost: 900, total_cost: 2700 },
-  ],
-  stockMoves: [
-    { id: 'sm1', date: '2026-03-24T10:30:00', movement_type: 'adjustment_in', direction: 'in', product_id: 'p3', warehouse_id: 'w3', qty: 3, unit_cost: 900, total_cost: 2700, reference_document_id: null, reference_text: 'Ajuste inicial' },
-    { id: 'sm2', date: '2026-03-25T09:00:00', movement_type: 'transfer_out', direction: 'out', product_id: 'p1', warehouse_id: 'w1', qty: 2, unit_cost: 1500, total_cost: 3000, reference_text: 'Transferência interna' },
-    { id: 'sm3', date: '2026-03-25T09:05:00', movement_type: 'transfer_in', direction: 'in', product_id: 'p1', warehouse_id: 'w2', qty: 2, unit_cost: 1500, total_cost: 3000, reference_text: 'Recepção da transferência' },
-  ],
+  products: [],
+  warehouses: [],
+  customers: [],
+  suppliers: [],
+  stockBalances: [],
+  stockMoves: [],
   documents: [],
 };
 
@@ -399,31 +374,6 @@ function buildDocument(data = {}) {
     totals: { linesCount: 0, grandTotal: 0 },
   };
 }
-
-function seedDocuments() {
-  if (state.documents.length) return;
-
-  const docDraft = buildDocument({ number: 'DOC-0001', date: '2026-03-25', type: 'stock_transfer', origin: 'Armazém Central', destination: 'Loja 1' });
-  docDraft.lines = [
-    createDocumentLine({ product_id: 'p1', quantity: 2, unitPrice: 1500 }),
-    createDocumentLine({ product_id: 'p2', quantity: 1, unitPrice: 2500 }),
-  ];
-  docDraft.lines.forEach((line) => {
-    line.document_id = docDraft.id;
-  });
-  recalculateDocumentTotals(docDraft);
-
-  const docPosted = buildDocument({ number: 'DOC-0002', date: '2026-03-24', type: 'stock_adjustment', destination: 'Stock Interno', status: 'posted', postedAt: '2026-03-24T10:30:00' });
-  docPosted.lines = [createDocumentLine({ product_id: 'p3', quantity: 3, unitPrice: 900 })];
-  docPosted.lines.forEach((line) => {
-    line.document_id = docPosted.id;
-  });
-  recalculateDocumentTotals(docPosted);
-
-  state.documents.push(docDraft, docPosted);
-}
-
-seedDocuments();
 
 export function getState() {
   return state;
