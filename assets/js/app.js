@@ -7,6 +7,7 @@ import { renderDocumentDetailPage } from './modules/documents/document-detail.pa
 import { renderDocumentFormPage } from './modules/documents/document-form.page.js';
 import { renderInventoryBalancesPage } from './modules/inventory/inventory-balances.page.js';
 import { renderInventoryLedgerPage } from './modules/inventory/inventory-ledger.page.js';
+import { renderProductsPage } from './modules/products/products.page.js';
 
 function redirectToDashboard() {
   navigateTo('#dashboard');
@@ -24,6 +25,8 @@ function bootstrapRoutes() {
   registerRoute('/inventory', renderInventoryBalancesPage);
   registerRoute('/inventory-balances', renderInventoryBalancesPage);
   registerRoute('/inventory-ledger', renderInventoryLedgerPage);
+
+  registerRoute('/products', renderProductsPage);
 }
 
 function bootstrapApp() {

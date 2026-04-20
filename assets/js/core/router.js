@@ -128,6 +128,11 @@ function updateSidebarActiveState(route = '') {
 
     if (target === '#inventory-ledger' && route === '/inventory-ledger') {
       link.classList.add('active');
+      return;
+    }
+
+    if (target === '#products' && route === '/products') {
+      link.classList.add('active');
     }
   });
 }
