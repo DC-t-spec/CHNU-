@@ -49,6 +49,7 @@ function buildSummary(lines = []) {
 
   return {
     linesCount: validLines.length,
+    totalQty: validLines.reduce((sum, line) => sum + toNumber(line.quantity, 0), 0),
     grandTotal: validLines.reduce((sum, line) => sum + calculateLineTotal(line), 0),
   };
 }
