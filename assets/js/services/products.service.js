@@ -1,55 +1,60 @@
 import { getProducts as getProductsFromState } from '../core/state.js';
+import { listProducts as listProductsFromProvider } from './providers/products.provider.js';
 
 function isPromiseLike(value) {
   return !!value && typeof value.then === 'function';
 }
 
-function resolveProductsProvider() {
-  if (typeof globalThis === 'undefined') return null;
-
-  return (
-    globalThis.productsProvider ||
-    globalThis.ProductsProvider ||
-    globalThis.CHNU?.productsProvider ||
-    null
-  );
+function normalizeProducts(result) {
+  return Array.isArray(result) ? result : [];
 }
 
-function readFromProvider(methodName) {
-  const provider = resolveProductsProvider();
+function readFromFallback() {
+  const result = getProductsFromState?.();
+  return normalizeProducts(result);
+}
 
-  if (!provider || typeof provider[methodName] !== 'function') {
+function readFromProviderSync() {
+  if (typeof listProductsFromProvider !== 'function') {
     return null;
   }
 
   try {
-    const result = provider[methodName]();
+    const result = listProductsFromProvider();
 
     if (isPromiseLike(result)) {
       return null;
     }
 
-    return Array.isArray(result) ? result : [];
+    return normalizeProducts(result);
   } catch {
     return null;
   }
 }
 
-function readFromFallback() {
-  const result = getProductsFromState?.();
-  return Array.isArray(result) ? result : [];
+async function readFromProviderAsync() {
+  if (typeof listProductsFromProvider !== 'function') {
+    return null;
+  }
+
+  try {
+    const result = await listProductsFromProvider();
+    return normalizeProducts(result);
+  } catch {
+    return null;
+  }
 }
 
 export function getProducts() {
-  return (
-    readFromProvider('getProducts') ??
-    readFromProvider('listProducts') ??
-    readFromFallback()
-  );
+  return readFromProviderSync() ?? readFromFallback();
 }
 
 export function listProducts() {
   return getProducts();
+}
+
+export async function listProductsAsync() {
+  return (await readFromProviderAsync()) ?? readFromFallback();
 }
 
 export function getInventoryProducts() {
