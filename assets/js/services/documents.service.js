@@ -86,6 +86,8 @@ function normalizeDocument(doc = {}) {
     destination: doc.destination ?? '',
     customer_id: doc.customer_id ?? doc.customerId ?? '',
     customer_name: doc.customer_name ?? doc.customerName ?? '',
+    supplier_id: doc.supplier_id ?? doc.supplierId ?? '',
+    supplier_name: doc.supplier_name ?? doc.supplierName ?? '',
     postedAt: doc.postedAt ?? doc.posted_at ?? null,
     cancelledAt: doc.cancelledAt ?? doc.cancelled_at ?? null,
     cancelReason: doc.cancelReason ?? doc.cancel_reason ?? '',
@@ -107,6 +109,15 @@ function getWarehousesInternal() {
   }));
 }
 
+function getSuppliersInternal() {
+  const result = callStateLoose(['getSuppliers']) ?? [];
+  return (Array.isArray(result) ? result : []).map((supplier, index) => ({
+    id: supplier.id ?? `supplier-${index + 1}`,
+    code: supplier.code ?? '',
+    name: supplier.name ?? supplier.label ?? `Fornecedor ${index + 1}`,
+  }));
+}
+
 function mapWarehouseName(value) {
   if (!value) return '';
   const warehouse = getWarehousesInternal().find((item) => item.id === value || item.name === value);
@@ -125,6 +136,7 @@ function validatePayload(values = {}, { isPosting = false } = {}) {
   lines.forEach((line, index) => {
     if (!line.product_id) throw new Error(`Linha ${index + 1}: product_id obrigatório.`);
     if (!Number.isFinite(line.qty) || line.qty <= 0) throw new Error(`Linha ${index + 1}: qty > 0 obrigatório.`);
+    if (!Number.isFinite(line.unit_cost) || line.unit_cost <= 0) throw new Error(`Linha ${index + 1}: unit_cost > 0 obrigatório.`);
   });
 
   if (type === 'stock_transfer') {
@@ -145,6 +157,13 @@ function validatePayload(values = {}, { isPosting = false } = {}) {
     if (!values.customer_id) throw new Error('Cliente obrigatório para venda.');
     if (!values.origin) throw new Error('Origem obrigatória para venda.');
   }
+
+  if (type === 'purchase') {
+    if (!values.supplier_id) throw new Error('Fornecedor obrigatório para compra.');
+    if (!values.destination) throw new Error('Destino obrigatório para compra.');
+    const supplierExists = getSuppliersInternal().some((supplier) => supplier.id === values.supplier_id);
+    if (!supplierExists) throw new Error('Fornecedor inválido para compra.');
+  }
 }
 
 function buildDocumentPayload(values = {}) {
@@ -164,6 +183,7 @@ function buildDocumentPayload(values = {}) {
     origin: mapWarehouseName(values.origin ?? ''),
     destination: mapWarehouseName(values.destination ?? ''),
     customer_id: values.customer_id ?? '',
+    supplier_id: values.supplier_id ?? '',
     lines: lines.map((line) => ({
       id: line.id,
       product_id: line.product_id,
@@ -194,6 +214,7 @@ export function listDocuments(filters = {}) {
     const matchStatus = status ? doc.status === status : true;
     const matchQuery = query
       ? [doc.number, doc.type_label, doc.reference, doc.origin, doc.destination, doc.customer_name, doc.notes]
+        .concat(doc.supplier_name ? [doc.supplier_name] : [])
         .join(' ')
         .toLowerCase()
         .includes(query)
@@ -298,4 +319,8 @@ export function getCustomers() {
     code: customer.code ?? '',
     name: customer.name ?? customer.label ?? `Cliente ${index + 1}`,
   }));
+}
+
+export function getSuppliers() {
+  return getSuppliersInternal();
 }

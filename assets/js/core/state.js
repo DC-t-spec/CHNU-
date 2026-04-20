@@ -17,6 +17,11 @@ const state = {
     { id: 'c2', code: 'CLI-002', name: 'Cliente Beta' },
     { id: 'c3', code: 'CLI-003', name: 'Cliente Gamma' },
   ],
+  suppliers: [
+    { id: 's1', code: 'FOR-001', name: 'Fornecedor Atlas' },
+    { id: 's2', code: 'FOR-002', name: 'Fornecedor Orion' },
+    { id: 's3', code: 'FOR-003', name: 'Fornecedor Nobre' },
+  ],
   stockBalances: [
     { id: 'sb1', product_id: 'p1', warehouse_id: 'w1', qty_on_hand: 12, qty_reserved: 2, qty_available: 10, avg_unit_cost: 1500, total_cost: 18000 },
     { id: 'sb2', product_id: 'p2', warehouse_id: 'w1', qty_on_hand: 8, qty_reserved: 1, qty_available: 7, avg_unit_cost: 2500, total_cost: 20000 },
@@ -71,6 +76,16 @@ function findCustomer(value) {
     normalizeText(customer.id) === lookup
     || normalizeText(customer.code) === lookup
     || normalizeText(customer.name) === lookup
+  )) || null;
+}
+
+function findSupplier(value) {
+  if (!value) return null;
+  const lookup = normalizeText(value);
+  return (state.suppliers || []).find((supplier) => (
+    normalizeText(supplier.id) === lookup
+    || normalizeText(supplier.code) === lookup
+    || normalizeText(supplier.name) === lookup
   )) || null;
 }
 
@@ -240,6 +255,9 @@ function validateDocumentBeforePosting(document) {
   if (resolveDocumentType(document.type) === 'sale' && !document.customer_id) {
     throw new Error('Cliente obrigatório para postar venda.');
   }
+  if (resolveDocumentType(document.type) === 'purchase' && !document.supplier_id) {
+    throw new Error('Fornecedor obrigatório para postar compra.');
+  }
   validateDocumentLines(document);
   validateDocumentWarehouses(document);
   validateDocumentStock(document);
@@ -325,6 +343,11 @@ function createStockMovesFromDocument(document, { isReversal = false } = {}) {
       return;
     }
 
+    if (type === 'purchase') {
+      createStockMove({ documentId: document.id, date: movementDate, movementType: isReversal ? 'purchase_reversal_out' : 'purchase_in', direction: isReversal ? 'out' : 'in', productId: product.id, warehouseId: destinationWarehouse.id, qty, unitCost, referenceText, isReversal });
+      return;
+    }
+
     if (type === 'stock_return') {
       createStockMove({ documentId: document.id, date: movementDate, movementType: isReversal ? 'return_reversal_out' : 'return_in', direction: isReversal ? 'out' : 'in', productId: product.id, warehouseId: destinationWarehouse.id, qty, unitCost, referenceText, isReversal });
       return;
@@ -349,6 +372,7 @@ function generateDocumentNumber() {
 
 function buildDocument(data = {}) {
   const customer = findCustomer(data.customer_id || data.customer_name);
+  const supplier = findSupplier(data.supplier_id || data.supplier_name);
   return {
     id: data.id || crypto.randomUUID(),
     company_id: data.company_id || data.companyId || 'default-company',
@@ -360,6 +384,8 @@ function buildDocument(data = {}) {
     destination: data.destination || '',
     customer_id: data.customer_id || customer?.id || '',
     customer_name: data.customer_name || customer?.name || '',
+    supplier_id: data.supplier_id || supplier?.id || '',
+    supplier_name: data.supplier_name || supplier?.name || '',
     notes: data.notes || '',
     created_at: data.created_at || new Date().toISOString(),
     postedAt: data.postedAt || null,
@@ -408,7 +434,7 @@ export function searchDocuments({ query = '', status = '', sortBy = 'date_desc' 
   const q = normalizeText(query);
 
   if (q) {
-    results = results.filter((doc) => [doc.number, doc.type, doc.origin, doc.destination, doc.customer_name, doc.notes].some((value) => normalizeText(value).includes(q)));
+    results = results.filter((doc) => [doc.number, doc.type, doc.origin, doc.destination, doc.customer_name, doc.supplier_name, doc.notes].some((value) => normalizeText(value).includes(q)));
   }
 
   if (status) {
@@ -442,8 +468,11 @@ export function updateDocument(id, data) {
   document.origin = data.origin || '';
   document.destination = data.destination || '';
   const customer = findCustomer(data.customer_id || data.customer_name || document.customer_id);
+  const supplier = findSupplier(data.supplier_id || data.supplier_name || document.supplier_id);
   document.customer_id = data.customer_id || customer?.id || '';
   document.customer_name = customer?.name || data.customer_name || '';
+  document.supplier_id = data.supplier_id || supplier?.id || '';
+  document.supplier_name = supplier?.name || data.supplier_name || '';
   document.notes = data.notes || '';
 
   return document;
@@ -537,6 +566,10 @@ export function getWarehouses() {
 
 export function getCustomers() {
   return state.customers || [];
+}
+
+export function getSuppliers() {
+  return state.suppliers || [];
 }
 
 export function getStockBalances() {

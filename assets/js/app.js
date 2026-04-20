@@ -16,6 +16,9 @@ import { renderReportsMovementsPage } from './modules/reports/reports-movements.
 import { renderSalesListPage } from './modules/sales/sales-list.page.js';
 import { renderSaleFormPage } from './modules/sales/sale-form.page.js';
 import { renderSaleDetailPage } from './modules/sales/sale-detail.page.js';
+import { renderPurchasesListPage } from './modules/purchases/purchases-list.page.js';
+import { renderPurchaseFormPage } from './modules/purchases/purchase-form.page.js';
+import { renderPurchaseDetailPage } from './modules/purchases/purchase-detail.page.js';
 
 function redirectToDashboard() {
   navigateTo('#dashboard');
@@ -34,6 +37,10 @@ function bootstrapRoutes() {
   registerRoute('/sales/new', renderSaleFormPage);
   registerRoute('/sales/edit', renderSaleFormPage);
   registerRoute('/sales/view', renderSaleDetailPage);
+  registerRoute('/purchases', renderPurchasesListPage);
+  registerRoute('/purchases/new', renderPurchaseFormPage);
+  registerRoute('/purchases/edit', renderPurchaseFormPage);
+  registerRoute('/purchases/view', renderPurchaseDetailPage);
 
   registerRoute('/inventory', renderInventoryBalancesPage);
   registerRoute('/inventory-balances', renderInventoryBalancesPage);

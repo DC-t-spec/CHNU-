@@ -121,6 +121,11 @@ function updateSidebarActiveState(route = '') {
       return;
     }
 
+    if (target === '#purchases' && route.startsWith('/purchases')) {
+      link.classList.add('active');
+      return;
+    }
+
     if (target === '#inventory' && route === '/inventory') {
       link.classList.add('active');
       return;
