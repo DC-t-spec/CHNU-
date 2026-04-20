@@ -4,29 +4,24 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_ENABLED } from './config.js';
 
 let supabaseClient = null;
 
-function hasSupabaseFactory() {
-  return typeof window !== 'undefined' && !!window.supabase?.createClient;
+export function isSupabaseReady() {
+  return (
+    SUPABASE_ENABLED &&
+    typeof window !== 'undefined' &&
+    window.supabase &&
+    typeof window.supabase.createClient === 'function'
+  );
 }
 
-function initSupabaseClient() {
-  if (!SUPABASE_ENABLED || !hasSupabaseFactory()) {
-    return null;
+export function getSupabaseClient() {
+  if (!isSupabaseReady()) return null;
+
+  if (!supabaseClient) {
+    supabaseClient = window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY
+    );
   }
 
-  return window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-}
-
-function getSupabaseClient() {
-  if (supabaseClient) {
-    return supabaseClient;
-  }
-
-  supabaseClient = initSupabaseClient();
   return supabaseClient;
 }
-
-function isSupabaseReady() {
-  return !!getSupabaseClient();
-}
-
-export { getSupabaseClient, isSupabaseReady };
