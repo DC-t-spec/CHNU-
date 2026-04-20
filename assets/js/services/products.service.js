@@ -1,7 +1,9 @@
 import { getProducts as getProductsFromState } from '../core/state.js';
 import {
   createProduct as createProductFromProvider,
+  getById as getProductByIdFromProvider,
   listProducts as listProductsFromProvider,
+  update as updateProductFromProvider,
 } from './providers/products.provider.js';
 
 function isPromiseLike(value) {
@@ -112,6 +114,66 @@ function validateCreatePayload(payload) {
   }
 }
 
+function normalizeEditPayload(payload = {}) {
+  const code = String(payload.code ?? '').trim();
+  const name = String(payload.name ?? '').trim();
+  const price = toNumber(payload.price);
+  const cost = toNumber(payload.cost);
+  const unit = String(payload.unit ?? '').trim() || null;
+  const min_qty = toNumber(payload.min_qty);
+
+  return {
+    code,
+    name,
+    price,
+    cost,
+    unit,
+    min_qty: min_qty ?? 0,
+  };
+}
+
+function validateEditPayload(payload, id) {
+  if (!payload.code) {
+    throw new Error('Código do produto é obrigatório.');
+  }
+
+  if (!payload.name) {
+    throw new Error('Nome do produto é obrigatório.');
+  }
+
+  if (payload.price === null) {
+    throw new Error('Preço do produto é obrigatório.');
+  }
+
+  if (payload.cost === null) {
+    throw new Error('Custo do produto é obrigatório.');
+  }
+
+  if (payload.price < 0) {
+    throw new Error('Preço do produto não pode ser negativo.');
+  }
+
+  if (payload.cost < 0) {
+    throw new Error('Custo do produto não pode ser negativo.');
+  }
+
+  if (payload.min_qty < 0) {
+    throw new Error('Quantidade mínima não pode ser negativa.');
+  }
+
+  const lookupCode = normalizeLookup(payload.code);
+  const lookupId = String(id ?? '');
+  const hasDuplicate = getProducts().some((product) => {
+    const productCode = normalizeLookup(product?.code ?? product?.sku);
+    const productId = String(product?.id ?? '');
+    return productCode === lookupCode && productId !== lookupId;
+  });
+
+  if (hasDuplicate) {
+    throw new Error('Já existe um produto com o mesmo código.');
+  }
+}
+
 export function getProducts() {
   return readFromProviderSync() ?? readFromFallback();
 }
@@ -141,4 +203,32 @@ export async function createProduct(payload = {}) {
   }
 
   return createProductFromProvider(normalizedPayload);
+}
+
+export async function getProductById(id) {
+  if (!id) return null;
+
+  if (typeof getProductByIdFromProvider !== 'function') {
+    const lookupId = String(id);
+    const fallback = getProducts().find((item) => String(item?.id ?? '') === lookupId);
+    return fallback ?? null;
+  }
+
+  const product = await getProductByIdFromProvider(id);
+  return product ?? null;
+}
+
+export async function updateProduct(id, payload = {}) {
+  if (!id) {
+    throw new Error('ID do produto é obrigatório para atualização.');
+  }
+
+  const normalizedPayload = normalizeEditPayload(payload);
+  validateEditPayload(normalizedPayload, id);
+
+  if (typeof updateProductFromProvider !== 'function') {
+    throw new Error('Provider de produtos indisponível para atualização.');
+  }
+
+  return updateProductFromProvider(id, normalizedPayload);
 }

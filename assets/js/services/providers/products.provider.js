@@ -80,6 +80,20 @@ async function listProductsFromSupabase() {
   return data.map(normalizeProduct);
 }
 
+async function getProductByIdFromSupabase(id) {
+  const client = getSupabaseClientSafe();
+  if (!client || !id) return null;
+
+  const { data, error } = await client
+    .from('products')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return normalizeProduct(data);
+}
+
 function pickCompanyIdFromUser(user) {
   if (!user || typeof user !== 'object') return null;
 
@@ -192,6 +206,61 @@ export async function getProductById(id) {
   const products = await listProducts();
 
   return products.find((product) => product.id === id) || null;
+}
+
+function buildUpdatePayload(payload = {}) {
+  const updatePayload = {
+    code: String(payload.code ?? '').trim(),
+    name: String(payload.name ?? '').trim(),
+    price: toNumber(payload.price, 0),
+    cost: toNumber(payload.cost, 0),
+    unit: String(payload.unit ?? '').trim() || null,
+    min_qty: toNumber(payload.min_qty, 0),
+  };
+
+  if (payload.is_active !== undefined) {
+    updatePayload.is_active = payload.is_active;
+  }
+
+  return updatePayload;
+}
+
+export async function getById(id) {
+  if (!id) return null;
+
+  if (isSupabaseReadySafe()) {
+    const fromSupabase = await getProductByIdFromSupabase(id);
+    if (fromSupabase) return fromSupabase;
+  }
+
+  return getProductById(id);
+}
+
+export async function update(id, payload = {}) {
+  if (!id) {
+    throw new Error('ID do produto é obrigatório para atualização.');
+  }
+
+  const client = getSupabaseClientSafe();
+  if (!client) {
+    throw new Error('Supabase não está configurado para atualizar produtos.');
+  }
+
+  const updatePayload = buildUpdatePayload(payload);
+
+  const { data, error } = await client
+    .from('products')
+    .update(updatePayload)
+    .eq('id', id)
+    .select('*')
+    .maybeSingle();
+
+  if (error || !data) {
+    const message = error?.message?.trim() || 'Erro ao atualizar produto no Supabase.';
+    throw new Error(message);
+  }
+
+  return normalizeProduct(data);
 }
 
 export async function createProduct(payload) {

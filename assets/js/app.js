@@ -9,6 +9,7 @@ import { renderInventoryBalancesPage } from './modules/inventory/inventory-balan
 import { renderInventoryLedgerPage } from './modules/inventory/inventory-ledger.page.js';
 import { renderProductsPage } from './modules/products/products.page.js';
 import { renderProductFormPage } from './modules/products/product-form.js';
+import { renderProductEditPage } from './modules/products/product-edit.page.js';
 
 function redirectToDashboard() {
   navigateTo('#dashboard');
@@ -29,6 +30,7 @@ function bootstrapRoutes() {
 
   registerRoute('/products', renderProductsPage);
   registerRoute('/products/new', renderProductFormPage);
+  registerRoute('/products/edit/:id', renderProductEditPage);
 }
 
 function bootstrapApp() {
