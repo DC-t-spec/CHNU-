@@ -67,15 +67,48 @@ function renderProductsRows(rows) {
     .join('');
 }
 
+function sortRows(rows, sortValue) {
+  const [key, direction] = String(sortValue ?? 'code_asc').split('_');
+  const multiplier = direction === 'desc' ? -1 : 1;
+
+  return [...rows].sort((a, b) => {
+    if (key === 'price') {
+      const valueA = Number(a.unitPrice ?? 0);
+      const valueB = Number(b.unitPrice ?? 0);
+      return (valueA - valueB) * multiplier;
+    }
+
+    const field = key === 'name' ? 'name' : 'code';
+    const valueA = String(a[field] ?? '').toLowerCase();
+    const valueB = String(b[field] ?? '').toLowerCase();
+    return valueA.localeCompare(valueB, 'pt-PT') * multiplier;
+  });
+}
+
+function paginateRows(rows, currentPage, pageSize) {
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const start = (safeCurrentPage - 1) * pageSize;
+  const paginatedRows = rows.slice(start, start + pageSize);
+
+  return {
+    paginatedRows,
+    currentPage: safeCurrentPage,
+    totalPages,
+  };
+}
+
 export async function renderProductsPage() {
   const app = document.querySelector('#app');
   if (!app) return;
 
   const products = await listProductsAsync();
   const allRows = (Array.isArray(products) ? products : []).map(normalizeProduct);
-  let filteredRows = [...allRows];
   let searchTerm = '';
   let statusFilter = 'all';
+  let sortOption = 'code_asc';
+  const pageSize = 10;
+  let currentPage = 1;
   let debounceTimer;
 
   app.innerHTML = `
@@ -107,6 +140,15 @@ export async function renderProductsPage() {
             <option value="active">Ativos</option>
             <option value="inactive">Inativos</option>
           </select>
+
+          <select id="products-sort" class="input" style="max-width:220px;">
+            <option value="code_asc">Code (A-Z)</option>
+            <option value="code_desc">Code (Z-A)</option>
+            <option value="name_asc">Name (A-Z)</option>
+            <option value="name_desc">Name (Z-A)</option>
+            <option value="price_asc">Unit price (↑)</option>
+            <option value="price_desc">Unit price (↓)</option>
+          </select>
         </div>
 
         <div class="table-responsive">
@@ -119,10 +161,16 @@ export async function renderProductsPage() {
                 <th style="text-align:right;">Ações</th>
               </tr>
             </thead>
-            <tbody>
-              ${renderProductsRows(filteredRows)}
-            </tbody>
+            <tbody></tbody>
           </table>
+        </div>
+
+        <div id="products-pagination" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px 16px 16px;">
+          <span id="products-pagination-state">Página 1 de 1</span>
+          <div style="display:flex;gap:8px;">
+            <button type="button" class="btn btn-secondary" id="products-prev-page">Anterior</button>
+            <button type="button" class="btn btn-secondary" id="products-next-page">Próxima</button>
+          </div>
         </div>
       </div>
     </section>
@@ -131,30 +179,44 @@ export async function renderProductsPage() {
   const tableBody = app.querySelector('tbody');
   const searchInput = app.querySelector('#products-search');
   const statusSelect = app.querySelector('#products-status-filter');
-  if (!tableBody || !searchInput || !statusSelect) return;
+  const sortSelect = app.querySelector('#products-sort');
+  const pageState = app.querySelector('#products-pagination-state');
+  const prevButton = app.querySelector('#products-prev-page');
+  const nextButton = app.querySelector('#products-next-page');
+  if (!tableBody || !searchInput || !statusSelect || !sortSelect || !pageState || !prevButton || !nextButton) return;
 
-  function applyFilters() {
+  function applyView() {
     const normalizedQuery = searchTerm.trim().toLowerCase();
 
-    filteredRows = allRows.filter((product) => {
-      const matchesSearch =
-        !normalizedQuery ||
+    const searchedRows = allRows.filter((product) => {
+      if (!normalizedQuery) return true;
+      return (
         String(product.code ?? '')
           .toLowerCase()
           .includes(normalizedQuery) ||
         String(product.name ?? '')
           .toLowerCase()
-          .includes(normalizedQuery);
-
-      const matchesStatus =
-        statusFilter === 'all' ||
-        (statusFilter === 'active' && product.is_active === true) ||
-        (statusFilter === 'inactive' && product.is_active === false);
-
-      return matchesSearch && matchesStatus;
+          .includes(normalizedQuery)
+      );
     });
 
-    tableBody.innerHTML = renderProductsRows(filteredRows);
+    const statusRows = searchedRows.filter((product) => {
+      return (
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && product.is_active === true) ||
+        (statusFilter === 'inactive' && product.is_active === false)
+      );
+    });
+
+    const sortedRows = sortRows(statusRows, sortOption);
+    const pagination = paginateRows(sortedRows, currentPage, pageSize);
+    currentPage = pagination.currentPage;
+
+    tableBody.innerHTML = renderProductsRows(pagination.paginatedRows);
+    pageState.textContent = `Página ${pagination.currentPage} de ${pagination.totalPages}`;
+    prevButton.disabled = pagination.currentPage <= 1;
+    nextButton.disabled = pagination.currentPage >= pagination.totalPages;
+
     attachRowEvents();
   }
 
@@ -181,7 +243,7 @@ export async function renderProductsPage() {
 
           if (rowIndex >= 0) {
             allRows[rowIndex] = normalizeProduct(updatedProduct, rowIndex);
-            applyFilters();
+            applyView();
           }
         } catch {
           button.disabled = false;
@@ -196,14 +258,32 @@ export async function renderProductsPage() {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
       searchTerm = nextValue;
-      applyFilters();
+      currentPage = 1;
+      applyView();
     }, 300);
   });
 
   statusSelect.addEventListener('change', (event) => {
     statusFilter = event.target?.value ?? 'all';
-    applyFilters();
+    currentPage = 1;
+    applyView();
   });
 
-  attachRowEvents();
+  sortSelect.addEventListener('change', (event) => {
+    sortOption = event.target?.value ?? 'code_asc';
+    currentPage = 1;
+    applyView();
+  });
+
+  prevButton.addEventListener('click', () => {
+    currentPage -= 1;
+    applyView();
+  });
+
+  nextButton.addEventListener('click', () => {
+    currentPage += 1;
+    applyView();
+  });
+
+  applyView();
 }
