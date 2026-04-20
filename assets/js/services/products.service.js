@@ -1,52 +1,61 @@
-import * as productsProvider from '../core/state.js';
+import { getProducts as getProductsFromState } from '../core/state.js';
 
-function hasMethod(provider, name) {
-  return Boolean(provider && typeof provider[name] === 'function');
+function isPromiseLike(value) {
+  return !!value && typeof value.then === 'function';
 }
 
-function callProvider(methodNames, ...args) {
-  for (const name of methodNames) {
-    if (hasMethod(productsProvider, name)) {
-      return productsProvider[name](...args);
-    }
+function resolveProductsProvider() {
+  if (typeof globalThis === 'undefined') return null;
+
+  return (
+    globalThis.productsProvider ||
+    globalThis.ProductsProvider ||
+    globalThis.CHNU?.productsProvider ||
+    null
+  );
+}
+
+function readFromProvider(methodName) {
+  const provider = resolveProductsProvider();
+
+  if (!provider || typeof provider[methodName] !== 'function') {
+    return null;
   }
 
-  // Fallback de compatibilidade (legado) para ambientes que ainda expõem provider global.
-  const legacyProvider = globalThis?.productsProvider;
-  for (const name of methodNames) {
-    if (hasMethod(legacyProvider, name)) {
-      return legacyProvider[name](...args);
+  try {
+    const result = provider[methodName]();
+
+    if (isPromiseLike(result)) {
+      return null;
     }
+
+    return Array.isArray(result) ? result : [];
+  } catch {
+    return null;
   }
-
-  return [];
 }
 
-function toNumber(value, fallback = 0) {
-  const num = Number(value);
-  return Number.isFinite(num) ? num : fallback;
-}
-
-function normalizeProduct(product = {}, index = 0) {
-  return {
-    id: product.id ?? `product-${index + 1}`,
-    code: product.code ?? product.sku ?? '',
-    name: product.name ?? product.itemName ?? product.description ?? `Produto ${index + 1}`,
-    unitPrice: toNumber(product.unitPrice ?? product.price ?? product.avgCost, 0),
-  };
+function readFromFallback() {
+  const result = getProductsFromState?.();
+  return Array.isArray(result) ? result : [];
 }
 
 export function getProducts() {
-  const result = callProvider(
-    ['getProducts', 'listProducts', 'getInventoryProducts', 'getProductsService'],
-    {}
-  );
-
-  return (Array.isArray(result) ? result : []).map((product, index) =>
-    normalizeProduct(product, index)
+  return (
+    readFromProvider('getProducts') ??
+    readFromProvider('listProducts') ??
+    readFromFallback()
   );
 }
 
-// Aliases de compatibilidade pública
-export const listProducts = getProducts;
-export const getProductsService = getProducts;
+export function listProducts() {
+  return getProducts();
+}
+
+export function getInventoryProducts() {
+  return getProducts();
+}
+
+export function getProductsService() {
+  return getProducts();
+}
