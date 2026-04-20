@@ -48,18 +48,6 @@ function formatDate(value) {
   }).format(date);
 }
 
-function getDirectionBadge(direction) {
-  if (direction === 'in') {
-    return `<span class="status-pill status-pill--success">Entrada</span>`;
-  }
-
-  if (direction === 'out') {
-    return `<span class="status-pill status-pill--danger">Saída</span>`;
-  }
-
-  return `<span class="status-pill">-</span>`;
-}
-
 function getMovementTypeLabel(type) {
   const labels = {
     transfer_out: 'Transferência saída',
@@ -86,12 +74,12 @@ function renderSummaryCards(summary) {
       </article>
 
       <article class="documents-stat-card">
-        <span class="documents-stat-card__label">Entradas</span>
+        <span class="documents-stat-card__label">Qty In</span>
         <strong class="documents-stat-card__value">${formatNumber(summary.total_in)}</strong>
       </article>
 
       <article class="documents-stat-card">
-        <span class="documents-stat-card__label">Saídas</span>
+        <span class="documents-stat-card__label">Qty Out</span>
         <strong class="documents-stat-card__value">${formatNumber(summary.total_out)}</strong>
       </article>
 
@@ -114,33 +102,13 @@ function renderFilters(filters, options) {
             name="query"
             class="toolbar__input"
             type="text"
-            placeholder="Produto, SKU, documento ou movimento"
+            placeholder="Produto (code ou name)"
             value="${escapeHtml(filters.query || '')}"
           />
         </div>
 
         <div class="toolbar__group">
-          <label class="toolbar__label" for="inventory-ledger-warehouse">Armazém</label>
-          <select
-            id="inventory-ledger-warehouse"
-            name="warehouse"
-            class="toolbar__select"
-          >
-            <option value="">Todos</option>
-            ${(options.warehouses || [])
-              .map(
-                (item) => `
-                  <option value="${escapeHtml(item)}" ${filters.warehouse === item ? 'selected' : ''}>
-                    ${escapeHtml(item)}
-                  </option>
-                `
-              )
-              .join('')}
-          </select>
-        </div>
-
-        <div class="toolbar__group">
-          <label class="toolbar__label" for="inventory-ledger-movementType">Movimento</label>
+          <label class="toolbar__label" for="inventory-ledger-movementType">Tipo movimento</label>
           <select
             id="inventory-ledger-movementType"
             name="movementType"
@@ -151,42 +119,11 @@ function renderFilters(filters, options) {
               .map(
                 (item) => `
                   <option value="${escapeHtml(item)}" ${filters.movementType === item ? 'selected' : ''}>
-                    ${escapeHtml(item)}
+                    ${escapeHtml(getMovementTypeLabel(item))}
                   </option>
                 `
               )
               .join('')}
-          </select>
-        </div>
-
-        <div class="toolbar__group">
-          <label class="toolbar__label" for="inventory-ledger-direction">Direcção</label>
-          <select
-            id="inventory-ledger-direction"
-            name="direction"
-            class="toolbar__select"
-          >
-            <option value="">Todas</option>
-            <option value="in" ${filters.direction === 'in' ? 'selected' : ''}>Entrada</option>
-            <option value="out" ${filters.direction === 'out' ? 'selected' : ''}>Saída</option>
-          </select>
-        </div>
-
-        <div class="toolbar__group">
-          <label class="toolbar__label" for="inventory-ledger-sort">Ordenar</label>
-          <select
-            id="inventory-ledger-sort"
-            name="sortBy"
-            class="toolbar__select"
-          >
-            <option value="date_desc" ${filters.sortBy === 'date_desc' ? 'selected' : ''}>Mais recente</option>
-            <option value="date_asc" ${filters.sortBy === 'date_asc' ? 'selected' : ''}>Mais antigo</option>
-            <option value="product_asc" ${filters.sortBy === 'product_asc' ? 'selected' : ''}>Produto A-Z</option>
-            <option value="product_desc" ${filters.sortBy === 'product_desc' ? 'selected' : ''}>Produto Z-A</option>
-            <option value="qty_desc" ${filters.sortBy === 'qty_desc' ? 'selected' : ''}>Maior qty</option>
-            <option value="qty_asc" ${filters.sortBy === 'qty_asc' ? 'selected' : ''}>Menor qty</option>
-            <option value="value_desc" ${filters.sortBy === 'value_desc' ? 'selected' : ''}>Maior valor</option>
-            <option value="value_asc" ${filters.sortBy === 'value_asc' ? 'selected' : ''}>Menor valor</option>
           </select>
         </div>
 
@@ -219,13 +156,10 @@ function renderLedgerTable(rows) {
             <tr>
               <th>Data</th>
               <th>Produto</th>
-              <th>Armazém</th>
-              <th>Tipo</th>
-              <th>Direcção</th>
-              <th>Quantidade</th>
-              <th>Custo unitário</th>
-              <th>Custo total</th>
-              <th>Referência</th>
+              <th>Tipo movimento</th>
+              <th>Qty In</th>
+              <th>Qty Out</th>
+              <th>Saldo</th>
             </tr>
           </thead>
           <tbody>
@@ -234,14 +168,14 @@ function renderLedgerTable(rows) {
                 (row) => `
                   <tr class="ledger-row ledger-row--${escapeHtml(row.direction || '')}">
                     <td>${formatDate(row.date)}</td>
-                    <td>${escapeHtml(row.product_name)}</td>
-                    <td>${escapeHtml(row.warehouse_name)}</td>
+                    <td>
+                      <strong>${escapeHtml(row.product_name)}</strong>
+                      <div class="table-meta">${escapeHtml(row.product_code)}</div>
+                    </td>
                     <td>${escapeHtml(getMovementTypeLabel(row.movement_type || row.move_type))}</td>
-                    <td>${getDirectionBadge(row.direction)}</td>
-                    <td>${formatNumber(row.qty)}</td>
-                    <td>${formatCurrency(row.unit_cost)}</td>
-                    <td>${formatCurrency(row.total_cost)}</td>
-                    <td>${escapeHtml(row.reference_label || '-')}</td>
+                    <td>${formatNumber(row.qty_in)}</td>
+                    <td>${formatNumber(row.qty_out)}</td>
+                    <td>${formatNumber(row.running_balance)}</td>
                   </tr>
                 `
               )
@@ -294,23 +228,14 @@ function bindLedgerPageEvents(pagination) {
 
     updateInventoryPageFilters({
       query: formData.get('query') || '',
-      warehouse: formData.get('warehouse') || '',
       movementType: formData.get('movementType') || '',
-      direction: formData.get('direction') || '',
-      sortBy: formData.get('sortBy') || 'date_desc',
+      sortBy: 'date_desc',
       page: 1,
     });
   });
 
   resetButton?.addEventListener('click', () => {
-    resetInventoryPageFilters([
-      'query',
-      'warehouse',
-      'movementType',
-      'direction',
-      'sortBy',
-      'page',
-    ]);
+    resetInventoryPageFilters(['query', 'movementType', 'sortBy', 'page']);
   });
 
   prevButton?.addEventListener('click', () => {
@@ -336,9 +261,7 @@ export async function renderInventoryLedgerPage() {
 
   const filters = getInventoryPageFilters({
     query: '',
-    warehouse: '',
     movementType: '',
-    direction: '',
     sortBy: 'date_desc',
     page: 1,
   });
@@ -348,10 +271,8 @@ export async function renderInventoryLedgerPage() {
 
   const rows = searchInventoryLedger({
     query: filters.query,
-    warehouse: filters.warehouse,
     movementType: filters.movementType,
-    direction: filters.direction,
-    sortBy: filters.sortBy,
+    sortBy: filters.sortBy || 'date_desc',
   });
 
   const { items, pagination } = paginateInventoryRows(rows, filters.page, PAGE_SIZE);
@@ -361,7 +282,7 @@ export async function renderInventoryLedgerPage() {
       <section class="page-header">
         <div>
           <h1>Inventory Ledger</h1>
-          <p>Histórico completo dos movimentos de stock por produto e armazém.</p>
+          <p>Histórico de movimentos de stock (mais recente primeiro).</p>
         </div>
       </section>
 

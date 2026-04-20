@@ -15,11 +15,12 @@ function normalizeText(value) {
   return String(value || '').trim().toLowerCase();
 }
 
-function getStockStatus(qtyAvailable) {
+function getStockStatus(qtyAvailable, minQty = 0) {
   const qty = safeNumber(qtyAvailable);
+  const threshold = Math.max(0, safeNumber(minQty));
 
   if (qty <= 0) return 'out';
-  if (qty <= 3) return 'low';
+  if (qty <= threshold) return 'low';
   return 'ok';
 }
 
@@ -33,6 +34,10 @@ function formatReferenceLabel(move, documentsMap) {
 
   if (move.reference_text) return move.reference_text;
   return '—';
+}
+
+function getProductCode(product) {
+  return product?.code || product?.sku || product?.product_code || '—';
 }
 
 function enrichBalanceRow(balance, productsMap, warehousesMap) {
@@ -52,12 +57,15 @@ function enrichBalanceRow(balance, productsMap, warehousesMap) {
       ? safeNumber(balance.total_cost)
       : qtyOnHand * avgUnitCost;
 
-  const stockStatus = getStockStatus(qtyAvailable);
+  const minQty = safeNumber(product?.min_qty);
+  const stockStatus = getStockStatus(qtyAvailable, minQty);
 
   return {
     ...balance,
+    product_code: getProductCode(product),
     product_name: product?.name || 'Produto sem nome',
     product_sku: product?.sku || '—',
+    product_min_qty: minQty,
     warehouse_name: warehouse?.name || 'Armazém sem nome',
     qty_on_hand: qtyOnHand,
     qty_reserved: qtyReserved,
@@ -77,17 +85,44 @@ function enrichLedgerRow(move, productsMap, warehousesMap, documentsMap) {
   const totalCost =
     move.total_cost != null ? safeNumber(move.total_cost) : qty * unitCost;
 
+  const direction = normalizeText(move.direction);
+  const qtyIn = direction === 'in' ? qty : 0;
+  const qtyOut = direction === 'out' ? qty : 0;
+
   return {
     ...move,
+    product_code: getProductCode(product),
     product_name: product?.name || 'Produto sem nome',
     product_sku: product?.sku || '—',
     warehouse_name: warehouse?.name || 'Armazém sem nome',
     qty,
+    qty_in: qtyIn,
+    qty_out: qtyOut,
     unit_cost: unitCost,
     total_cost: totalCost,
     reference_label: formatReferenceLabel(move, documentsMap),
     reference_id: move.reference_document_id || '',
   };
+}
+
+function withRunningBalance(rows) {
+  const runningByProduct = new Map();
+
+  return rows
+    .slice()
+    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .map((row) => {
+      const key = `${row.product_id || ''}:${row.warehouse_id || ''}`;
+      const previousBalance = safeNumber(runningByProduct.get(key));
+      const nextBalance = previousBalance + safeNumber(row.qty_in) - safeNumber(row.qty_out);
+      runningByProduct.set(key, nextBalance);
+
+      return {
+        ...row,
+        running_balance: nextBalance,
+      };
+    })
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
 }
 
 function matchesText(row, query) {
@@ -96,6 +131,7 @@ function matchesText(row, query) {
   const q = normalizeText(query);
 
   return [
+    row.product_code,
     row.product_name,
     row.product_sku,
     row.warehouse_name,
@@ -137,11 +173,11 @@ export function getInventoryLedger() {
   const warehousesMap = new Map(warehouses.map((item) => [item.id, item]));
   const documentsMap = new Map(documents.map((item) => [item.id, item]));
 
-  return stockMoves
-    .map((move) =>
-      enrichLedgerRow(move, productsMap, warehousesMap, documentsMap)
-    )
-    .sort((a, b) => new Date(b.date) - new Date(a.date));
+  const enriched = stockMoves.map((move) =>
+    enrichLedgerRow(move, productsMap, warehousesMap, documentsMap)
+  );
+
+  return withRunningBalance(enriched);
 }
 
 export function getInventoryBalanceSummary() {
@@ -193,13 +229,15 @@ export function getInventoryLedgerSummary() {
 
   const totalMoves = ledger.length;
 
-  const totalIn = ledger
-    .filter((row) => row.direction === 'in')
-    .reduce((sum, row) => sum + safeNumber(row.qty), 0);
+  const totalIn = ledger.reduce(
+    (sum, row) => sum + safeNumber(row.qty_in),
+    0
+  );
 
-  const totalOut = ledger
-    .filter((row) => row.direction === 'out')
-    .reduce((sum, row) => sum + safeNumber(row.qty), 0);
+  const totalOut = ledger.reduce(
+    (sum, row) => sum + safeNumber(row.qty_out),
+    0
+  );
 
   const totalValue = ledger.reduce(
     (sum, row) => sum + safeNumber(row.total_cost),
@@ -223,7 +261,11 @@ export function searchInventoryBalances({
   let rows = [...getInventoryBalances()];
 
   if (query) {
-    rows = rows.filter((row) => matchesText(row, query));
+    rows = rows.filter((row) =>
+      [row.product_code, row.product_name]
+        .filter(Boolean)
+        .some((value) => normalizeText(value).includes(normalizeText(query)))
+    );
   }
 
   if (warehouse) {
@@ -286,7 +328,11 @@ export function searchInventoryLedger({
   let rows = [...getInventoryLedger()];
 
   if (query) {
-    rows = rows.filter((row) => matchesText(row, query));
+    rows = rows.filter((row) =>
+      [row.product_code, row.product_name]
+        .filter(Boolean)
+        .some((value) => normalizeText(value).includes(normalizeText(query)))
+    );
   }
 
   if (warehouse) {
