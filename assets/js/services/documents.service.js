@@ -84,6 +84,8 @@ function normalizeDocument(doc = {}) {
     notes: doc.notes ?? '',
     origin: doc.origin ?? '',
     destination: doc.destination ?? '',
+    customer_id: doc.customer_id ?? doc.customerId ?? '',
+    customer_name: doc.customer_name ?? doc.customerName ?? '',
     postedAt: doc.postedAt ?? doc.posted_at ?? null,
     cancelledAt: doc.cancelledAt ?? doc.cancelled_at ?? null,
     cancelReason: doc.cancelReason ?? doc.cancel_reason ?? '',
@@ -138,6 +140,11 @@ function validatePayload(values = {}, { isPosting = false } = {}) {
   if (type === 'stock_exit' && !values.origin) {
     throw new Error('Origem obrigatória para saída de stock.');
   }
+
+  if (type === 'sale') {
+    if (!values.customer_id) throw new Error('Cliente obrigatório para venda.');
+    if (!values.origin) throw new Error('Origem obrigatória para venda.');
+  }
 }
 
 function buildDocumentPayload(values = {}) {
@@ -156,6 +163,7 @@ function buildDocumentPayload(values = {}) {
     notes: values.notes ?? '',
     origin: mapWarehouseName(values.origin ?? ''),
     destination: mapWarehouseName(values.destination ?? ''),
+    customer_id: values.customer_id ?? '',
     lines: lines.map((line) => ({
       id: line.id,
       product_id: line.product_id,
@@ -185,7 +193,7 @@ export function listDocuments(filters = {}) {
   return docs.filter((doc) => {
     const matchStatus = status ? doc.status === status : true;
     const matchQuery = query
-      ? [doc.number, doc.type_label, doc.reference, doc.origin, doc.destination, doc.notes]
+      ? [doc.number, doc.type_label, doc.reference, doc.origin, doc.destination, doc.customer_name, doc.notes]
         .join(' ')
         .toLowerCase()
         .includes(query)
@@ -281,4 +289,13 @@ export function getProducts() {
 
 export function getWarehouses() {
   return getWarehousesInternal();
+}
+
+export function getCustomers() {
+  const result = callStateLoose(['getCustomers']) ?? [];
+  return (Array.isArray(result) ? result : []).map((customer, index) => ({
+    id: customer.id ?? `customer-${index + 1}`,
+    code: customer.code ?? '',
+    name: customer.name ?? customer.label ?? `Cliente ${index + 1}`,
+  }));
 }

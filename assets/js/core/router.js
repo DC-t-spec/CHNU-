@@ -116,6 +116,11 @@ function updateSidebarActiveState(route = '') {
       return;
     }
 
+    if (target === '#sales' && route.startsWith('/sales')) {
+      link.classList.add('active');
+      return;
+    }
+
     if (target === '#inventory' && route === '/inventory') {
       link.classList.add('active');
       return;

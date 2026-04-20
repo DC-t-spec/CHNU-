@@ -12,6 +12,11 @@ const state = {
     { id: 'w2', name: 'Loja 1' },
     { id: 'w3', name: 'Stock Interno' },
   ],
+  customers: [
+    { id: 'c1', code: 'CLI-001', name: 'Cliente Alpha' },
+    { id: 'c2', code: 'CLI-002', name: 'Cliente Beta' },
+    { id: 'c3', code: 'CLI-003', name: 'Cliente Gamma' },
+  ],
   stockBalances: [
     { id: 'sb1', product_id: 'p1', warehouse_id: 'w1', qty_on_hand: 12, qty_reserved: 2, qty_available: 10, avg_unit_cost: 1500, total_cost: 18000 },
     { id: 'sb2', product_id: 'p2', warehouse_id: 'w1', qty_on_hand: 8, qty_reserved: 1, qty_available: 7, avg_unit_cost: 2500, total_cost: 20000 },
@@ -56,6 +61,16 @@ function findWarehouse(value) {
   const lookup = normalizeText(value);
   return (state.warehouses || []).find((warehouse) => (
     normalizeText(warehouse.id) === lookup || normalizeText(warehouse.name) === lookup
+  )) || null;
+}
+
+function findCustomer(value) {
+  if (!value) return null;
+  const lookup = normalizeText(value);
+  return (state.customers || []).find((customer) => (
+    normalizeText(customer.id) === lookup
+    || normalizeText(customer.code) === lookup
+    || normalizeText(customer.name) === lookup
   )) || null;
 }
 
@@ -222,6 +237,9 @@ function validateDocumentStock(document) {
 function validateDocumentBeforePosting(document) {
   if (!document) throw new Error('Documento não encontrado.');
   if (document.status !== 'draft') throw new Error('Apenas documentos em draft podem ser postados.');
+  if (resolveDocumentType(document.type) === 'sale' && !document.customer_id) {
+    throw new Error('Cliente obrigatório para postar venda.');
+  }
   validateDocumentLines(document);
   validateDocumentWarehouses(document);
   validateDocumentStock(document);
@@ -302,6 +320,11 @@ function createStockMovesFromDocument(document, { isReversal = false } = {}) {
       return;
     }
 
+    if (type === 'sale') {
+      createStockMove({ documentId: document.id, date: movementDate, movementType: isReversal ? 'sale_reversal_in' : 'sale_out', direction: isReversal ? 'in' : 'out', productId: product.id, warehouseId: originWarehouse.id, qty, unitCost, referenceText, isReversal });
+      return;
+    }
+
     if (type === 'stock_return') {
       createStockMove({ documentId: document.id, date: movementDate, movementType: isReversal ? 'return_reversal_out' : 'return_in', direction: isReversal ? 'out' : 'in', productId: product.id, warehouseId: destinationWarehouse.id, qty, unitCost, referenceText, isReversal });
       return;
@@ -325,6 +348,7 @@ function generateDocumentNumber() {
 }
 
 function buildDocument(data = {}) {
+  const customer = findCustomer(data.customer_id || data.customer_name);
   return {
     id: data.id || crypto.randomUUID(),
     company_id: data.company_id || data.companyId || 'default-company',
@@ -334,6 +358,8 @@ function buildDocument(data = {}) {
     status: data.status || 'draft',
     origin: data.origin || '',
     destination: data.destination || '',
+    customer_id: data.customer_id || customer?.id || '',
+    customer_name: data.customer_name || customer?.name || '',
     notes: data.notes || '',
     created_at: data.created_at || new Date().toISOString(),
     postedAt: data.postedAt || null,
@@ -382,7 +408,7 @@ export function searchDocuments({ query = '', status = '', sortBy = 'date_desc' 
   const q = normalizeText(query);
 
   if (q) {
-    results = results.filter((doc) => [doc.number, doc.type, doc.origin, doc.destination, doc.notes].some((value) => normalizeText(value).includes(q)));
+    results = results.filter((doc) => [doc.number, doc.type, doc.origin, doc.destination, doc.customer_name, doc.notes].some((value) => normalizeText(value).includes(q)));
   }
 
   if (status) {
@@ -415,6 +441,9 @@ export function updateDocument(id, data) {
   document.type = resolveDocumentType(data.type);
   document.origin = data.origin || '';
   document.destination = data.destination || '';
+  const customer = findCustomer(data.customer_id || data.customer_name || document.customer_id);
+  document.customer_id = data.customer_id || customer?.id || '';
+  document.customer_name = customer?.name || data.customer_name || '';
   document.notes = data.notes || '';
 
   return document;
@@ -504,6 +533,10 @@ export function getProducts() {
 
 export function getWarehouses() {
   return state.warehouses || [];
+}
+
+export function getCustomers() {
+  return state.customers || [];
 }
 
 export function getStockBalances() {
