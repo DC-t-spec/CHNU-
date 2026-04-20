@@ -33,9 +33,33 @@ function getSupabaseClientSafe() {
   return null;
 }
 
+function normalizeUnitPrice(product) {
+  const price = Number(product?.price);
+  if (Number.isFinite(price)) return price;
+
+  const cost = Number(product?.cost);
+  if (Number.isFinite(cost)) return cost;
+
+  const unitPrice = Number(product?.unit_price ?? product?.unitPrice);
+  if (Number.isFinite(unitPrice)) return unitPrice;
+
+  return 0;
+}
+
+function normalizeProduct(product) {
+  return {
+    id: product?.id ?? null,
+    code: product?.code ?? '',
+    name: product?.name ?? '',
+    unit_price: normalizeUnitPrice(product),
+    created_at: product?.created_at ?? null,
+  };
+}
+
 function listProductsFromState() {
   const products = getProducts();
-  return Array.isArray(products) ? products : [];
+  if (!Array.isArray(products)) return [];
+  return products.map(normalizeProduct);
 }
 
 async function listProductsFromSupabase() {
@@ -45,13 +69,16 @@ async function listProductsFromSupabase() {
     return listProductsFromState();
   }
 
-  const { data, error } = await client.from('products').select('*');
+  const { data, error } = await client
+    .from('products')
+    .select('*')
+    .order('created_at', { ascending: false });
 
   if (error || !Array.isArray(data)) {
     return listProductsFromState();
   }
 
-  return data;
+  return data.map(normalizeProduct);
 }
 
 export async function listProducts() {
