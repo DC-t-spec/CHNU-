@@ -81,19 +81,34 @@ function renderProductsRows(rows) {
 }
 
 function sortRows(rows, sortValue) {
-  const sorted = [...rows];
+  const [key, direction] = String(sortValue ?? 'code_asc').split('_');
+  const multiplier = direction === 'desc' ? -1 : 1;
 
-  const compareText = (a, b) =>
-    String(a ?? '').localeCompare(String(b ?? ''), 'pt-PT', { sensitivity: 'base', numeric: true });
+  return [...rows].sort((a, b) => {
+    if (key === 'price') {
+      const valueA = Number(a.unitPrice ?? 0);
+      const valueB = Number(b.unitPrice ?? 0);
+      return (valueA - valueB) * multiplier;
+    }
 
-  if (sortValue === 'code_asc') sorted.sort((a, b) => compareText(a.code, b.code));
-  else if (sortValue === 'code_desc') sorted.sort((a, b) => compareText(b.code, a.code));
-  else if (sortValue === 'name_asc') sorted.sort((a, b) => compareText(a.name, b.name));
-  else if (sortValue === 'name_desc') sorted.sort((a, b) => compareText(b.name, a.name));
-  else if (sortValue === 'price_asc') sorted.sort((a, b) => Number(a.unitPrice ?? 0) - Number(b.unitPrice ?? 0));
-  else if (sortValue === 'price_desc') sorted.sort((a, b) => Number(b.unitPrice ?? 0) - Number(a.unitPrice ?? 0));
+    const field = key === 'name' ? 'name' : 'code';
+    const valueA = String(a[field] ?? '').toLowerCase();
+    const valueB = String(b[field] ?? '').toLowerCase();
+    return valueA.localeCompare(valueB, 'pt-PT') * multiplier;
+  });
+}
 
-  return sorted;
+function paginateRows(rows, currentPage, pageSize) {
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const start = (safeCurrentPage - 1) * pageSize;
+  const paginatedRows = rows.slice(start, start + pageSize);
+
+  return {
+    paginatedRows,
+    currentPage: safeCurrentPage,
+    totalPages,
+  };
 }
 
 export async function renderProductsPage() {
@@ -102,10 +117,10 @@ export async function renderProductsPage() {
 
   const products = await listProductsAsync();
   const allRows = (Array.isArray(products) ? products : []).map(normalizeProduct);
-
   let searchTerm = '';
   let statusFilter = 'all';
-  let sortBy = 'code_asc';
+  let sortOption = 'code_asc';
+  const pageSize = 10;
   let currentPage = 1;
   let debounceTimer;
 
@@ -122,43 +137,31 @@ export async function renderProductsPage() {
         </div>
       </div>
 
-      <div class="card products-card">
-        <div class="products-toolbar" role="search">
-          <div class="toolbar__group toolbar__group--search products-toolbar__search">
-            <label for="products-search" class="toolbar__label">Pesquisar</label>
-            <input
-              type="search"
-              class="toolbar__input products-toolbar__input"
-              id="products-search"
-              placeholder="Pesquisar por code ou name"
-              autocomplete="off"
-            />
-          </div>
+      <div class="card" style="margin-top:16px;">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:16px 16px 0 16px;">
+          <input
+            type="search"
+            class="input"
+            id="products-search"
+            placeholder="Pesquisar por code ou name"
+            autocomplete="off"
+            style="min-width:240px;flex:1;"
+          />
 
-          <div class="toolbar__group products-toolbar__filter">
-            <label for="products-status-filter" class="toolbar__label">Status</label>
-            <select id="products-status-filter" class="toolbar__select products-toolbar__select">
-              <option value="all">Todos</option>
-              <option value="active">Ativos</option>
-              <option value="inactive">Inativos</option>
-            </select>
-          </div>
+          <select id="products-status-filter" class="input" style="max-width:200px;">
+            <option value="all">Todos</option>
+            <option value="active">Ativos</option>
+            <option value="inactive">Inativos</option>
+          </select>
 
-          <div class="toolbar__group products-toolbar__sort">
-            <label for="products-sort" class="toolbar__label">Ordenar por</label>
-            <select id="products-sort" class="toolbar__select products-toolbar__select">
-              <option value="code_asc">Code (A → Z)</option>
-              <option value="code_desc">Code (Z → A)</option>
-              <option value="name_asc">Name (A → Z)</option>
-              <option value="name_desc">Name (Z → A)</option>
-              <option value="price_asc">Price (menor → maior)</option>
-              <option value="price_desc">Price (maior → menor)</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="products-table-header">
-          <span id="products-total-results" class="products-total-results">0 produtos</span>
+          <select id="products-sort" class="input" style="max-width:220px;">
+            <option value="code_asc">Code (A-Z)</option>
+            <option value="code_desc">Code (Z-A)</option>
+            <option value="name_asc">Name (A-Z)</option>
+            <option value="name_desc">Name (Z-A)</option>
+            <option value="price_asc">Unit price (↑)</option>
+            <option value="price_desc">Unit price (↓)</option>
+          </select>
         </div>
 
         <div class="table-responsive products-table-wrap">
@@ -176,10 +179,12 @@ export async function renderProductsPage() {
           </table>
         </div>
 
-        <div class="pagination products-pagination">
-          <button type="button" class="btn btn-secondary btn-sm" id="products-prev-page">Anterior</button>
-          <span id="products-pagination-info" class="pagination-info">Página 1 de 1</span>
-          <button type="button" class="btn btn-secondary btn-sm" id="products-next-page">Próxima</button>
+        <div id="products-pagination" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px 16px 16px;">
+          <span id="products-pagination-state">Página 1 de 1</span>
+          <div style="display:flex;gap:8px;">
+            <button type="button" class="btn btn-secondary" id="products-prev-page">Anterior</button>
+            <button type="button" class="btn btn-secondary" id="products-next-page">Próxima</button>
+          </div>
         </div>
       </div>
     </section>
@@ -189,46 +194,44 @@ export async function renderProductsPage() {
   const searchInput = app.querySelector('#products-search');
   const statusSelect = app.querySelector('#products-status-filter');
   const sortSelect = app.querySelector('#products-sort');
-  const totalResults = app.querySelector('#products-total-results');
-  const prevPageButton = app.querySelector('#products-prev-page');
-  const nextPageButton = app.querySelector('#products-next-page');
-  const paginationInfo = app.querySelector('#products-pagination-info');
+  const pageState = app.querySelector('#products-pagination-state');
+  const prevButton = app.querySelector('#products-prev-page');
+  const nextButton = app.querySelector('#products-next-page');
+  if (!tableBody || !searchInput || !statusSelect || !sortSelect || !pageState || !prevButton || !nextButton) return;
 
-  if (
-    !tableBody ||
-    !searchInput ||
-    !statusSelect ||
-    !sortSelect ||
-    !totalResults ||
-    !prevPageButton ||
-    !nextPageButton ||
-    !paginationInfo
-  ) {
-    return;
-  }
-
-  function getProcessedRows() {
+  function applyView() {
     const normalizedQuery = searchTerm.trim().toLowerCase();
 
-    const filtered = allRows.filter((product) => {
-      const matchesSearch =
-        !normalizedQuery ||
+    const searchedRows = allRows.filter((product) => {
+      if (!normalizedQuery) return true;
+      return (
         String(product.code ?? '')
           .toLowerCase()
           .includes(normalizedQuery) ||
         String(product.name ?? '')
           .toLowerCase()
-          .includes(normalizedQuery);
-
-      const matchesStatus =
-        statusFilter === 'all' ||
-        (statusFilter === 'active' && product.is_active === true) ||
-        (statusFilter === 'inactive' && product.is_active === false);
-
-      return matchesSearch && matchesStatus;
+          .includes(normalizedQuery)
+      );
     });
 
-    return sortRows(filtered, sortBy);
+    const statusRows = searchedRows.filter((product) => {
+      return (
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && product.is_active === true) ||
+        (statusFilter === 'inactive' && product.is_active === false)
+      );
+    });
+
+    const sortedRows = sortRows(statusRows, sortOption);
+    const pagination = paginateRows(sortedRows, currentPage, pageSize);
+    currentPage = pagination.currentPage;
+
+    tableBody.innerHTML = renderProductsRows(pagination.paginatedRows);
+    pageState.textContent = `Página ${pagination.currentPage} de ${pagination.totalPages}`;
+    prevButton.disabled = pagination.currentPage <= 1;
+    nextButton.disabled = pagination.currentPage >= pagination.totalPages;
+
+    attachRowEvents();
   }
 
   function attachRowEvents() {
@@ -253,7 +256,7 @@ export async function renderProductsPage() {
 
           if (rowIndex >= 0) {
             allRows[rowIndex] = normalizeProduct(updatedProduct, rowIndex);
-            renderTable();
+            applyView();
           }
         } catch {
           button.disabled = false;
@@ -290,34 +293,31 @@ export async function renderProductsPage() {
     debounceTimer = setTimeout(() => {
       searchTerm = nextValue;
       currentPage = 1;
-      renderTable();
+      applyView();
     }, 300);
   });
 
   statusSelect.addEventListener('change', (event) => {
     statusFilter = event.target?.value ?? 'all';
     currentPage = 1;
-    renderTable();
+    applyView();
   });
 
   sortSelect.addEventListener('change', (event) => {
-    sortBy = event.target?.value ?? 'code_asc';
+    sortOption = event.target?.value ?? 'code_asc';
     currentPage = 1;
-    renderTable();
+    applyView();
   });
 
-  prevPageButton.addEventListener('click', () => {
-    if (currentPage <= 1) return;
+  prevButton.addEventListener('click', () => {
     currentPage -= 1;
-    renderTable();
+    applyView();
   });
 
-  nextPageButton.addEventListener('click', () => {
-    const totalPages = Math.max(1, Math.ceil(getProcessedRows().length / PAGE_SIZE));
-    if (currentPage >= totalPages) return;
+  nextButton.addEventListener('click', () => {
     currentPage += 1;
-    renderTable();
+    applyView();
   });
 
-  renderTable();
+  applyView();
 }
