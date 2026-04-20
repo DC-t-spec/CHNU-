@@ -131,7 +131,7 @@ function updateSidebarActiveState(route = '') {
       return;
     }
 
-    if (target === '#products' && route === '/products') {
+    if (target === '#products' && route.startsWith('/products')) {
       link.classList.add('active');
     }
   });

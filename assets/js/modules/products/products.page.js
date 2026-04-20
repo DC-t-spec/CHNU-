@@ -66,6 +66,10 @@ export async function renderProductsPage() {
           <h1>Products</h1>
           <p>Consulta de produtos cadastrados no sistema.</p>
         </div>
+
+        <div class="page-actions">
+          <a href="#products/new" class="btn btn-primary">+ Novo produto</a>
+        </div>
       </div>
 
       <div class="card" style="margin-top:16px;">
