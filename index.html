@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="./assets/css/modules/inventory.css" />
   <link rel="stylesheet" href="./assets/css/modules/products.css" />
   <link rel="stylesheet" href="./assets/css/modules/reports.css" />
+  <link rel="stylesheet" href="./assets/css/modules/dashboard.css" />
 </head>
 
 <body>
@@ -21,19 +22,62 @@
     <aside class="sidebar">
       <div class="sidebar__brand">
         <h1>CHNU</h1>
+        <p>ERP Suite</p>
       </div>
 
-      <nav class="sidebar__nav">
-        <a href="#dashboard" class="sidebar__link">Dashboard</a>
-        <a href="#documents" class="sidebar__link">Documentos</a>
-        <a href="#documents/new" class="sidebar__link">Novo Documento</a>
-        <a href="#inventory" class="sidebar__link">Inventory</a>
-        <a href="#inventory-balances" class="sidebar__link">Inventory Balances</a>
-        <a href="#inventory-ledger" class="sidebar__link">Inventory Ledger</a>
-        <a href="#products" class="sidebar__link">Products</a>
-        <a href="#reports" class="sidebar__link">Reports Dashboard</a>
-        <a href="#reports-stock" class="sidebar__link">Stock Report</a>
-        <a href="#reports-movements" class="sidebar__link">Movement Report</a>
+      <nav class="sidebar__nav" aria-label="Primary navigation">
+        <div class="sidebar__section">
+          <a href="#dashboard" class="sidebar__link" data-nav-group="dashboard">
+            <span class="sidebar__link-label">Dashboard</span>
+          </a>
+        </div>
+
+        <div class="sidebar__section">
+          <p class="sidebar__section-title">Operations</p>
+
+          <a href="#documents" class="sidebar__link" data-nav-group="operations">
+            <span class="sidebar__link-label">Documents</span>
+          </a>
+          <a href="#sales" class="sidebar__link" data-nav-group="operations">
+            <span class="sidebar__link-label">Sales</span>
+          </a>
+          <a href="#purchases" class="sidebar__link" data-nav-group="operations">
+            <span class="sidebar__link-label">Purchases</span>
+          </a>
+          <a href="#inventory-balances" class="sidebar__link" data-nav-group="operations">
+            <span class="sidebar__link-label">Inventory Balances</span>
+          </a>
+          <a href="#inventory-ledger" class="sidebar__link" data-nav-group="operations">
+            <span class="sidebar__link-label">Inventory Ledger</span>
+          </a>
+        </div>
+
+        <div class="sidebar__section">
+          <p class="sidebar__section-title">Catalog</p>
+
+          <a href="#products" class="sidebar__link" data-nav-group="catalog">
+            <span class="sidebar__link-label">Products</span>
+          </a>
+        </div>
+
+        <div class="sidebar__section">
+          <p class="sidebar__section-title">Analytics</p>
+
+          <a href="#reports" class="sidebar__link" data-nav-group="analytics">
+            <span class="sidebar__link-label">Reports Dashboard</span>
+          </a>
+          <a href="#reports-stock" class="sidebar__link" data-nav-group="analytics">
+            <span class="sidebar__link-label">Stock Report</span>
+          </a>
+          <a href="#reports-movements" class="sidebar__link" data-nav-group="analytics">
+            <span class="sidebar__link-label">Movement Report</span>
+          </a>
+        </div>
+
+        <div class="sidebar__section sidebar__section--future" aria-hidden="true">
+          <p class="sidebar__section-title">Settings</p>
+          <span class="sidebar__section-placeholder">Coming soon</span>
+        </div>
       </nav>
     </aside>
 

@@ -1,18 +1,4 @@
-import {
-  getDocuments,
-  getProducts,
-  getWarehouses,
-} from '../../core/state.js';
-
-import {
-  getInventoryBalanceSummary,
-  getInventoryLedgerSummary,
-  getInventoryLedger,
-} from '../../services/inventory.service.js';
-
-function safeArray(value) {
-  return Array.isArray(value) ? value : [];
-}
+import { getDashboardExecutiveData } from '../../services/dashboard.service.js';
 
 function formatNumber(value) {
   return new Intl.NumberFormat('pt-PT').format(Number(value || 0));
@@ -29,17 +15,7 @@ function formatDate(value) {
   if (!value) return '-';
 
   const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    if (typeof value === 'string' && value.includes('-')) {
-      const [year, month, day] = value.split('-');
-      if (year && month && day) {
-        return `${day}/${month}/${year}`;
-      }
-    }
-
-    return value;
-  }
+  if (Number.isNaN(date.getTime())) return String(value);
 
   return new Intl.DateTimeFormat('pt-PT', {
     dateStyle: 'short',
@@ -57,39 +33,23 @@ function escapeHtml(value) {
 }
 
 function getDocumentStatusLabel(status) {
-  const labels = {
+  return {
     draft: 'Rascunho',
     posted: 'Postado',
     cancelled: 'Cancelado',
-  };
-
-  return labels[status] || status || '-';
+  }[status] || status || '-';
 }
 
 function getDocumentStatusClass(status) {
-  const map = {
+  return {
     draft: 'status-draft',
     posted: 'status-posted',
     cancelled: 'status-cancelled',
-  };
-
-  return map[status] || '';
-}
-
-function getDirectionBadge(direction) {
-  if (direction === 'in') {
-    return `<span class="status-pill status-pill--success">Entrada</span>`;
-  }
-
-  if (direction === 'out') {
-    return `<span class="status-pill status-pill--danger">Saída</span>`;
-  }
-
-  return `<span class="status-pill">-</span>`;
+  }[status] || '';
 }
 
 function getMovementTypeLabel(type) {
-  const labels = {
+  return {
     transfer_out: 'Transferência saída',
     transfer_in: 'Transferência entrada',
     transfer_reversal_in: 'Reversão entrada',
@@ -100,207 +60,52 @@ function getMovementTypeLabel(type) {
     purchase: 'Compra',
     production_in: 'Produção entrada',
     production_out: 'Produção saída',
-  };
-
-  return labels[type] || type || '-';
+  }[type] || type || '-';
 }
 
-function getDashboardData() {
-  const documents = safeArray(getDocuments?.());
-  const products = safeArray(getProducts?.());
-  const warehouses = safeArray(getWarehouses?.());
+function renderKpis(kpis) {
+  const items = [
+    { label: 'Produtos ativos', value: formatNumber(kpis.activeProducts) },
+    { label: 'Documentos totais', value: formatNumber(kpis.totalDocuments) },
+    { label: 'Vendas postadas', value: formatNumber(kpis.postedSales) },
+    { label: 'Compras postadas', value: formatNumber(kpis.postedPurchases) },
+    { label: 'Itens em stock', value: formatNumber(kpis.stockItems) },
+    { label: 'Produtos com stock baixo', value: formatNumber(kpis.lowStockProducts) },
+    { label: 'Produtos sem stock', value: formatNumber(kpis.outOfStockProducts) },
+    { label: 'Valor total de stock', value: formatCurrency(kpis.totalStockValue) },
+  ];
 
-  const inventorySummary = getInventoryBalanceSummary?.() || {
-    total_items: 0,
-    total_qty_on_hand: 0,
-    total_qty_reserved: 0,
-    total_qty_available: 0,
-    total_stock_value: 0,
-    total_out_of_stock: 0,
-    total_low_stock: 0,
-  };
-
-  const ledgerSummary = getInventoryLedgerSummary?.() || {
-    total_moves: 0,
-    total_in: 0,
-    total_out: 0,
-    total_value: 0,
-  };
-
-  const ledger = safeArray(getInventoryLedger?.());
-
-  const documentStats = {
-    total: documents.length,
-    draft: documents.filter((doc) => doc.status === 'draft').length,
-    posted: documents.filter((doc) => doc.status === 'posted').length,
-    cancelled: documents.filter((doc) => doc.status === 'cancelled').length,
-  };
-
-  const recentDocuments = [...documents]
-    .sort((a, b) => {
-      const dateA = new Date(b.updatedAt || b.createdAt || b.date || 0);
-      const dateB = new Date(a.updatedAt || a.createdAt || a.date || 0);
-      return dateA - dateB;
-    })
-    .slice(0, 6);
-
-  const recentMoves = [...ledger]
-    .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
-    .slice(0, 8);
-
-  return {
-    documentStats,
-    inventorySummary,
-    ledgerSummary,
-    masterData: {
-      products: products.length,
-      warehouses: warehouses.length,
-    },
-    recentDocuments,
-    recentMoves,
-  };
-}
-
-function renderTopMetrics(data) {
   return `
-    <section class="documents-stats-grid">
-      <article class="documents-stat-card">
-        <span class="documents-stat-card__label">Documentos</span>
-        <strong class="documents-stat-card__value">${formatNumber(data.documentStats.total)}</strong>
-      </article>
-
-      <article class="documents-stat-card">
-        <span class="documents-stat-card__label">Itens em stock</span>
-        <strong class="documents-stat-card__value">${formatNumber(data.inventorySummary.total_items)}</strong>
-      </article>
-
-      <article class="documents-stat-card">
-        <span class="documents-stat-card__label">Movimentos stock</span>
-        <strong class="documents-stat-card__value">${formatNumber(data.ledgerSummary.total_moves)}</strong>
-      </article>
-
-      <article class="documents-stat-card">
-        <span class="documents-stat-card__label">Valor total stock</span>
-        <strong class="documents-stat-card__value">${formatCurrency(data.inventorySummary.total_stock_value)}</strong>
-      </article>
+    <section class="dashboard-kpis-grid">
+      ${items
+        .map(
+          (item) => `
+            <article class="dashboard-kpi-card">
+              <span class="dashboard-kpi-card__label">${item.label}</span>
+              <strong class="dashboard-kpi-card__value">${item.value}</strong>
+            </article>
+          `
+        )
+        .join('')}
     </section>
   `;
 }
 
-function renderOperationalCards(data) {
-  return `
-    <section class="grid-3">
-      <article class="card">
-        <div class="section-header">
-          <div>
-            <h2>Documentos</h2>
-            <p>Estado operacional actual</p>
-          </div>
-        </div>
-
-        <div class="detail-grid">
-          <div>
-            <strong>Total</strong>
-            <span>${formatNumber(data.documentStats.total)}</span>
-          </div>
-
-          <div>
-            <strong>Rascunhos</strong>
-            <span>${formatNumber(data.documentStats.draft)}</span>
-          </div>
-
-          <div>
-            <strong>Postados</strong>
-            <span>${formatNumber(data.documentStats.posted)}</span>
-          </div>
-
-          <div>
-            <strong>Cancelados</strong>
-            <span>${formatNumber(data.documentStats.cancelled)}</span>
-          </div>
-        </div>
-      </article>
-
-      <article class="card">
-        <div class="section-header">
-          <div>
-            <h2>Inventário</h2>
-            <p>Capacidade actual do stock</p>
-          </div>
-        </div>
-
-        <div class="detail-grid">
-          <div>
-            <strong>Qty on hand</strong>
-            <span>${formatNumber(data.inventorySummary.total_qty_on_hand)}</span>
-          </div>
-
-          <div>
-            <strong>Qty available</strong>
-            <span>${formatNumber(data.inventorySummary.total_qty_available)}</span>
-          </div>
-
-          <div>
-            <strong>Sem stock</strong>
-            <span>${formatNumber(data.inventorySummary.total_out_of_stock)}</span>
-          </div>
-
-          <div>
-            <strong>Stock baixo</strong>
-            <span>${formatNumber(data.inventorySummary.total_low_stock)}</span>
-          </div>
-        </div>
-      </article>
-
-      <article class="card">
-        <div class="section-header">
-          <div>
-            <h2>Base do sistema</h2>
-            <p>Dados mestres disponíveis</p>
-          </div>
-        </div>
-
-        <div class="detail-grid">
-          <div>
-            <strong>Produtos</strong>
-            <span>${formatNumber(data.masterData.products)}</span>
-          </div>
-
-          <div>
-            <strong>Armazéns</strong>
-            <span>${formatNumber(data.masterData.warehouses)}</span>
-          </div>
-
-          <div>
-            <strong>Entradas</strong>
-            <span>${formatNumber(data.ledgerSummary.total_in)}</span>
-          </div>
-
-          <div>
-            <strong>Saídas</strong>
-            <span>${formatNumber(data.ledgerSummary.total_out)}</span>
-          </div>
-        </div>
-      </article>
-    </section>
-  `;
-}
-
-function renderQuickActions() {
+function renderOperationalStatus(documentsByStatus) {
   return `
     <section class="card">
       <div class="section-header">
         <div>
-          <h2>Ações rápidas</h2>
-          <p>Acessos directos para operação diária</p>
+          <h2>Estado operacional dos documentos</h2>
+          <p>Distribuição por status da operação documental.</p>
         </div>
       </div>
 
-      <div class="page-actions">
-        <a href="#documents/new" class="btn btn-primary">Novo documento</a>
-        <a href="#documents" class="btn btn-secondary">Ver documentos</a>
-        <a href="#inventory-balances" class="btn btn-secondary">Inventory Balances</a>
-        <a href="#inventory-ledger" class="btn btn-secondary">Inventory Ledger</a>
+      <div class="detail-grid">
+        <div><strong>Total</strong><span>${formatNumber(documentsByStatus.total)}</span></div>
+        <div><strong>Rascunho</strong><span>${formatNumber(documentsByStatus.draft)}</span></div>
+        <div><strong>Postado</strong><span>${formatNumber(documentsByStatus.posted)}</span></div>
+        <div><strong>Cancelado</strong><span>${formatNumber(documentsByStatus.cancelled)}</span></div>
       </div>
     </section>
   `;
@@ -311,24 +116,22 @@ function renderRecentDocuments(documents) {
     <section class="card">
       <div class="section-header">
         <div>
-          <h2>Documentos recentes</h2>
-          <p>Últimos documentos registados no sistema</p>
+          <h2>Últimos documentos</h2>
+          <p>Documentos mais recentes com acesso rápido ao detalhe.</p>
         </div>
       </div>
-
       ${
         documents.length
           ? `
             <div class="table-responsive">
-              <table class="table">
+              <table class="data-table dashboard-table">
                 <thead>
                   <tr>
                     <th>Número</th>
                     <th>Data</th>
                     <th>Tipo</th>
                     <th>Status</th>
-                    <th>Origem</th>
-                    <th>Destino</th>
+                    <th>Total</th>
                     <th>Ação</th>
                   </tr>
                 </thead>
@@ -339,17 +142,10 @@ function renderRecentDocuments(documents) {
                         <tr>
                           <td>${escapeHtml(doc.number || '-')}</td>
                           <td>${formatDate(doc.date || doc.createdAt || doc.updatedAt)}</td>
-                          <td>${escapeHtml(doc.type || '-')}</td>
-                          <td>
-                            <span class="status-chip ${getDocumentStatusClass(doc.status)}">
-                              ${escapeHtml(getDocumentStatusLabel(doc.status))}
-                            </span>
-                          </td>
-                          <td>${escapeHtml(doc.origin || '-')}</td>
-                          <td>${escapeHtml(doc.destination || '-')}</td>
-                          <td>
-                            <a href="#documents/view?id=${doc.id}" class="btn btn-sm btn-secondary">Ver</a>
-                          </td>
+                          <td>${escapeHtml(doc.type_label || doc.type || '-')}</td>
+                          <td><span class="status-chip ${getDocumentStatusClass(doc.status)}">${escapeHtml(getDocumentStatusLabel(doc.status))}</span></td>
+                          <td>${formatCurrency(doc.grandTotal)}</td>
+                          <td><a class="btn btn-sm btn-secondary" href="#documents/view?id=${doc.id}">Ver</a></td>
                         </tr>
                       `
                     )
@@ -358,12 +154,7 @@ function renderRecentDocuments(documents) {
               </table>
             </div>
           `
-          : `
-            <div class="empty-state">
-              <h2>Sem documentos</h2>
-              <p>Ainda não existem documentos registados.</p>
-            </div>
-          `
+          : '<div class="empty-state"><h2>Sem documentos</h2><p>Ainda não existem documentos registados.</p></div>'
       }
     </section>
   `;
@@ -374,8 +165,8 @@ function renderRecentMoves(moves) {
     <section class="card">
       <div class="section-header">
         <div>
-          <h2>Movimentos recentes</h2>
-          <p>Últimos movimentos do ledger de stock</p>
+          <h2>Últimos movimentos de stock</h2>
+          <p>Movimentos recentes no ledger para monitorização operacional.</p>
         </div>
       </div>
 
@@ -383,37 +174,111 @@ function renderRecentMoves(moves) {
         moves.length
           ? `
             <div class="table-responsive">
-              <table class="table">
+              <table class="data-table dashboard-table">
                 <thead>
                   <tr>
                     <th>Data</th>
                     <th>Produto</th>
                     <th>Armazém</th>
                     <th>Tipo</th>
-                    <th>Direcção</th>
+                    <th>Direção</th>
                     <th>Qty</th>
-                    <th>Total</th>
-                    <th>Referência</th>
                   </tr>
                 </thead>
                 <tbody>
                   ${moves
                     .map(
                       (move) => `
-                        <tr class="ledger-row ledger-row--${escapeHtml(move.direction || '')}">
+                        <tr>
                           <td>${formatDate(move.date)}</td>
-                          <td>${escapeHtml(move.product_name)}</td>
-                          <td>${escapeHtml(move.warehouse_name)}</td>
+                          <td>${escapeHtml(move.product_name || '-')}</td>
+                          <td>${escapeHtml(move.warehouse_name || '-')}</td>
                           <td>${escapeHtml(getMovementTypeLabel(move.movement_type || move.move_type))}</td>
-                          <td>${getDirectionBadge(move.direction)}</td>
+                          <td>${escapeHtml(move.direction === 'in' ? 'Entrada' : move.direction === 'out' ? 'Saída' : '-')}</td>
                           <td>${formatNumber(move.qty)}</td>
-                          <td>${formatCurrency(move.total_cost)}</td>
+                        </tr>
+                      `
+                    )
+                    .join('')}
+                </tbody>
+              </table>
+            </div>
+          `
+          : '<div class="empty-state"><h2>Sem movimentos</h2><p>Ainda não existem movimentos de stock registados.</p></div>'
+      }
+    </section>
+  `;
+}
+
+function renderSalesVsPurchases(commerce) {
+  return `
+    <section class="card">
+      <div class="section-header">
+        <div>
+          <h2>Resumo rápido: vendas vs compras</h2>
+          <p>Comparação de documentos postados e valor total movimentado.</p>
+        </div>
+      </div>
+
+      <div class="dashboard-compare-grid">
+        <div class="dashboard-compare-item">
+          <strong>Vendas postadas</strong>
+          <span>${formatNumber(commerce.postedSalesCount)}</span>
+          <small>${formatCurrency(commerce.postedSalesValue)}</small>
+        </div>
+
+        <div class="dashboard-compare-item">
+          <strong>Compras postadas</strong>
+          <span>${formatNumber(commerce.postedPurchasesCount)}</span>
+          <small>${formatCurrency(commerce.postedPurchasesValue)}</small>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderHighlights(highlights) {
+  return `
+    <section class="card">
+      <div class="section-header">
+        <div>
+          <h2>Destaques operacionais</h2>
+          <p>Produtos com risco de ruptura para ação imediata.</p>
+        </div>
+      </div>
+
+      <div class="dashboard-highlight-summary">
+        <span class="status-pill status-pill--danger">Sem stock: ${formatNumber(highlights.outOfStockProducts)}</span>
+        <span class="status-pill status-pill--warning">Stock baixo: ${formatNumber(highlights.lowStockProducts)}</span>
+      </div>
+
+      ${
+        highlights.lowOrOutRows.length
+          ? `
+            <div class="table-responsive">
+              <table class="data-table dashboard-table">
+                <thead>
+                  <tr>
+                    <th>Produto</th>
+                    <th>Armazém</th>
+                    <th>Disponível</th>
+                    <th>Mínimo</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${highlights.lowOrOutRows
+                    .map(
+                      (row) => `
+                        <tr>
+                          <td>${escapeHtml(row.product_name || '-')}</td>
+                          <td>${escapeHtml(row.warehouse_name || '-')}</td>
+                          <td>${formatNumber(row.qty_available)}</td>
+                          <td>${formatNumber(row.product_min_qty)}</td>
                           <td>
-                            ${
-                              move.reference_id
-                                ? `<a href="#documents/view?id=${move.reference_id}" class="btn btn-sm btn-secondary">${escapeHtml(move.reference_label || 'Documento')}</a>`
-                                : escapeHtml(move.reference_label || '-')
-                            }
+                            <span class="status-pill ${row.stock_status === 'out' ? 'status-pill--danger' : 'status-pill--warning'}">
+                              ${row.stock_status === 'out' ? 'Sem stock' : 'Stock baixo'}
+                            </span>
                           </td>
                         </tr>
                       `
@@ -423,12 +288,7 @@ function renderRecentMoves(moves) {
               </table>
             </div>
           `
-          : `
-            <div class="empty-state">
-              <h2>Sem movimentos</h2>
-              <p>Ainda não existem movimentos de stock registados.</p>
-            </div>
-          `
+          : '<div class="empty-state"><h2>Sem alertas</h2><p>Não há produtos em condição crítica no momento.</p></div>'
       }
     </section>
   `;
@@ -438,30 +298,35 @@ export async function renderDashboardPage() {
   const appRoot = document.querySelector('#app');
   if (!appRoot) return;
 
-  const data = getDashboardData();
+  const data = getDashboardExecutiveData();
 
   appRoot.innerHTML = `
     <section class="page-shell dashboard-page">
       <div class="page-header">
         <div>
-          <h1>Dashboard</h1>
-          <p>Visão executiva do sistema ERP/Admin.</p>
+          <h1>Dashboard Executivo</h1>
+          <p>Visão integrada da operação com dados de produtos, documentos, vendas, compras e stock.</p>
         </div>
 
         <div class="page-actions">
           <a href="#documents/new" class="btn btn-primary">Novo documento</a>
-          <a href="#inventory-balances" class="btn btn-secondary">Ver stock</a>
+          <a href="#reports" class="btn btn-secondary">Abrir reports</a>
         </div>
       </div>
 
-      ${renderTopMetrics(data)}
-      ${renderOperationalCards(data)}
-      ${renderQuickActions()}
+      ${renderKpis(data.kpis)}
 
-      <section class="grid-2">
+      <section class="dashboard-grid-2">
+        ${renderOperationalStatus(data.documentsByStatus)}
+        ${renderSalesVsPurchases(data.commerce)}
+      </section>
+
+      <section class="dashboard-grid-2">
         ${renderRecentDocuments(data.recentDocuments)}
         ${renderRecentMoves(data.recentMoves)}
       </section>
+
+      ${renderHighlights(data.highlights)}
     </section>
   `;
 }
