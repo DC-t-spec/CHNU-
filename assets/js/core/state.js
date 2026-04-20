@@ -1,252 +1,76 @@
+import { normalizeDocumentType, DOCUMENT_TYPE_META } from '../services/document-engine.helper.js';
+
 const state = {
   products: [
-    {
-      id: 'p1',
-      name: 'Produto A',
-      sku: 'SKU-A',
-    },
-    {
-      id: 'p2',
-      name: 'Produto B',
-      sku: 'SKU-B',
-    },
-    {
-      id: 'p3',
-      name: 'Produto C',
-      sku: 'SKU-C',
-    },
-     {
-    id: 'p4',
-    name: 'TV RCD',
-    sku: 'tvrcd',
-  },
+    { id: 'p1', name: 'Produto A', sku: 'SKU-A' },
+    { id: 'p2', name: 'Produto B', sku: 'SKU-B' },
+    { id: 'p3', name: 'Produto C', sku: 'SKU-C' },
+    { id: 'p4', name: 'TV RCD', sku: 'tvrcd' },
   ],
-
   warehouses: [
-    {
-      id: 'w1',
-      name: 'Armazém Central',
-    },
-    {
-      id: 'w2',
-      name: 'Loja 1',
-    },
-    {
-      id: 'w3',
-      name: 'Stock Interno',
-    },
+    { id: 'w1', name: 'Armazém Central' },
+    { id: 'w2', name: 'Loja 1' },
+    { id: 'w3', name: 'Stock Interno' },
   ],
-
   stockBalances: [
-    {
-      id: 'sb1',
-      product_id: 'p1',
-      warehouse_id: 'w1',
-      qty_on_hand: 12,
-      qty_reserved: 2,
-      qty_available: 10,
-      avg_unit_cost: 1500,
-      total_cost: 18000,
-    },
-    {
-      id: 'sb2',
-      product_id: 'p2',
-      warehouse_id: 'w1',
-      qty_on_hand: 8,
-      qty_reserved: 1,
-      qty_available: 7,
-      avg_unit_cost: 2500,
-      total_cost: 20000,
-    },
-    {
-      id: 'sb3',
-      product_id: 'p3',
-      warehouse_id: 'w3',
-      qty_on_hand: 3,
-      qty_reserved: 0,
-      qty_available: 3,
-      avg_unit_cost: 900,
-      total_cost: 2700,
-    },
+    { id: 'sb1', product_id: 'p1', warehouse_id: 'w1', qty_on_hand: 12, qty_reserved: 2, qty_available: 10, avg_unit_cost: 1500, total_cost: 18000 },
+    { id: 'sb2', product_id: 'p2', warehouse_id: 'w1', qty_on_hand: 8, qty_reserved: 1, qty_available: 7, avg_unit_cost: 2500, total_cost: 20000 },
+    { id: 'sb3', product_id: 'p3', warehouse_id: 'w3', qty_on_hand: 3, qty_reserved: 0, qty_available: 3, avg_unit_cost: 900, total_cost: 2700 },
   ],
-
   stockMoves: [
-    {
-      id: 'sm1',
-      date: '2026-03-24T10:30:00',
-      movement_type: 'adjustment_in',
-      direction: 'in',
-      product_id: 'p3',
-      warehouse_id: 'w3',
-      qty: 3,
-      unit_cost: 900,
-      total_cost: 2700,
-      reference_document_id: null,
-      reference_text: 'Ajuste inicial',
-    },
-    {
-      id: 'sm2',
-      date: '2026-03-25T09:00:00',
-      movement_type: 'transfer_out',
-      direction: 'out',
-      product_id: 'p1',
-      warehouse_id: 'w1',
-      qty: 2,
-      unit_cost: 1500,
-      total_cost: 3000,
-      reference_text: 'Transferência interna',
-    },
-    {
-      id: 'sm3',
-      date: '2026-03-25T09:05:00',
-      movement_type: 'transfer_in',
-      direction: 'in',
-      product_id: 'p1',
-      warehouse_id: 'w2',
-      qty: 2,
-      unit_cost: 1500,
-      total_cost: 3000,
-      reference_text: 'Recepção da transferência',
-    },
+    { id: 'sm1', date: '2026-03-24T10:30:00', movement_type: 'adjustment_in', direction: 'in', product_id: 'p3', warehouse_id: 'w3', qty: 3, unit_cost: 900, total_cost: 2700, reference_document_id: null, reference_text: 'Ajuste inicial' },
+    { id: 'sm2', date: '2026-03-25T09:00:00', movement_type: 'transfer_out', direction: 'out', product_id: 'p1', warehouse_id: 'w1', qty: 2, unit_cost: 1500, total_cost: 3000, reference_text: 'Transferência interna' },
+    { id: 'sm3', date: '2026-03-25T09:05:00', movement_type: 'transfer_in', direction: 'in', product_id: 'p1', warehouse_id: 'w2', qty: 2, unit_cost: 1500, total_cost: 3000, reference_text: 'Recepção da transferência' },
   ],
-
-  documents: [
-    {
-      id: crypto.randomUUID(),
-      number: 'DOC-0001',
-      date: '2026-03-25',
-      type: 'Transferência',
-      origin: 'Armazém Central',
-      destination: 'Loja 1',
-      status: 'draft',
-      lines: [
-        createDocumentLine({
-          item: 'Produto A',
-          quantity: 2,
-          unitPrice: 1500,
-        }),
-        createDocumentLine({
-          item: 'Produto B',
-          quantity: 1,
-          unitPrice: 2500,
-        }),
-      ],
-      totals: {
-        linesCount: 2,
-        grandTotal: 5500,
-      },
-      postedAt: null,
-      cancelledAt: null,
-      cancelReason: '',
-    },
-    {
-      id: crypto.randomUUID(),
-      number: 'DOC-0002',
-      date: '2026-03-24',
-      type: 'Ajuste',
-      origin: 'Armazém Central',
-      destination: 'Stock Interno',
-      status: 'posted',
-      lines: [
-        createDocumentLine({
-          item: 'Produto C',
-          quantity: 3,
-          unitPrice: 900,
-        }),
-      ],
-      totals: {
-        linesCount: 1,
-        grandTotal: 2700,
-      },
-      postedAt: '2026-03-24T10:30:00',
-      cancelledAt: null,
-      cancelReason: '',
-    },
-  ],
+  documents: [],
 };
-
-function findProductById(productId) {
-  return (
-    (state.products || []).find(
-      (product) => product.id === productId
-    ) || null
-  );
-}
-
-// ==============================
-// HELPERS (NÃO EXPORTADOS)
-// ==============================
 
 function normalizeText(value) {
   return String(value || '').trim().toLowerCase();
 }
 
-function findWarehouseByName(name) {
-  return (
-    (state.warehouses || []).find(
-      (warehouse) => normalizeText(warehouse.name) === normalizeText(name)
-    ) || null
-  );
+function toNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function resolveDocumentType(type = "") {
+  return normalizeDocumentType(type);
+}
+
+function findProductById(productId) {
+  return (state.products || []).find((product) => product.id === productId) || null;
 }
 
 function findProduct(value) {
   const lookup = normalizeText(value);
-
-  if (!lookup) return null;
-
-  return (
-    (state.products || []).find((product) => {
-      return (
-        normalizeText(product.id) === lookup ||
-        normalizeText(product.name) === lookup ||
-        normalizeText(product.sku) === lookup
-      );
-    }) || null
-  );
+  return (state.products || []).find((product) => (
+    normalizeText(product.id) === lookup
+    || normalizeText(product.name) === lookup
+    || normalizeText(product.sku) === lookup
+  )) || null;
 }
 
-function resolveLineProduct(line) {
-  if (!line) return null;
-
-  if (line.product_id) {
-    const productById = findProductById(line.product_id);
-    if (productById) return productById;
-  }
-
-  return findProduct(line.item);
+function findWarehouse(value) {
+  if (!value) return null;
+  const lookup = normalizeText(value);
+  return (state.warehouses || []).find((warehouse) => (
+    normalizeText(warehouse.id) === lookup || normalizeText(warehouse.name) === lookup
+  )) || null;
 }
 
 function ensureStockStructures() {
-  if (!Array.isArray(state.stockMoves)) {
-    state.stockMoves = [];
-  }
-
-  if (!Array.isArray(state.stockBalances)) {
-    state.stockBalances = [];
-  }
+  if (!Array.isArray(state.stockMoves)) state.stockMoves = [];
+  if (!Array.isArray(state.stockBalances)) state.stockBalances = [];
 }
 
 function getStockBalanceByProductAndWarehouse(productId, warehouseId) {
-  return (
-    state.stockBalances.find(
-      (item) => item.product_id === productId && item.warehouse_id === warehouseId
-    ) || null
-  );
-}
-
-function getAvailableQty(productId, warehouseId) {
-  const balance = getStockBalanceByProductAndWarehouse(productId, warehouseId);
-
-  if (!balance) return 0;
-
-  return Number(balance.qty_available ?? balance.qty_on_hand ?? 0);
+  return state.stockBalances.find((item) => item.product_id === productId && item.warehouse_id === warehouseId) || null;
 }
 
 function getOrCreateStockBalance(productId, warehouseId) {
   ensureStockStructures();
-
   let balance = getStockBalanceByProductAndWarehouse(productId, warehouseId);
-
   if (!balance) {
     balance = {
       id: crypto.randomUUID(),
@@ -258,163 +82,172 @@ function getOrCreateStockBalance(productId, warehouseId) {
       avg_unit_cost: 0,
       total_cost: 0,
     };
-
     state.stockBalances.push(balance);
   }
-
   return balance;
 }
 
 function recalculateBalance(balance) {
-  balance.qty_available =
-    Number(balance.qty_on_hand || 0) - Number(balance.qty_reserved || 0);
-
-  balance.total_cost =
-    Number(balance.qty_on_hand || 0) * Number(balance.avg_unit_cost || 0);
-
+  balance.qty_available = toNumber(balance.qty_on_hand) - toNumber(balance.qty_reserved);
+  balance.total_cost = toNumber(balance.qty_on_hand) * toNumber(balance.avg_unit_cost);
   return balance;
 }
 
+function getAvailableQty(productId, warehouseId) {
+  const balance = getStockBalanceByProductAndWarehouse(productId, warehouseId);
+  if (!balance) return 0;
+  return toNumber(balance.qty_available ?? balance.qty_on_hand);
+}
+
+function calculateLineTotal(quantity, unitPrice) {
+  return toNumber(quantity) * toNumber(unitPrice);
+}
+
+function createDocumentLine({ id, product_id = '', item, quantity, unitPrice }) {
+  const product = product_id ? findProductById(product_id) : findProduct(item);
+  const safeQty = toNumber(quantity);
+  const safeUnitPrice = toNumber(unitPrice);
+
+  return {
+    id: id || crypto.randomUUID(),
+    document_id: '',
+    product_id: product?.id || product_id || '',
+    item: product?.name || item || '',
+    product_code: product?.sku || '',
+    product_name: product?.name || item || '',
+    quantity: safeQty,
+    qty: safeQty,
+    unitPrice: safeUnitPrice,
+    unit_cost: safeUnitPrice,
+    unit_price: safeUnitPrice,
+    total: calculateLineTotal(safeQty, safeUnitPrice),
+    line_total: calculateLineTotal(safeQty, safeUnitPrice),
+    created_at: new Date().toISOString(),
+  };
+}
+
+function recalculateDocumentTotals(document) {
+  document.lines = (document.lines || []).map((line) => {
+    const quantity = toNumber(line.quantity ?? line.qty);
+    const unitPrice = toNumber(line.unitPrice ?? line.unit_cost ?? line.unit_price);
+    const total = calculateLineTotal(quantity, unitPrice);
+    return {
+      ...line,
+      quantity,
+      qty: quantity,
+      unitPrice,
+      unit_cost: unitPrice,
+      unit_price: unitPrice,
+      total,
+      line_total: total,
+    };
+  });
+
+  document.totals = {
+    linesCount: document.lines.length,
+    grandTotal: document.lines.reduce((sum, line) => sum + toNumber(line.total), 0),
+  };
+
+  return document.totals;
+}
+
+function resolveLineProduct(line) {
+  if (!line) return null;
+  if (line.product_id) {
+    const byId = findProductById(line.product_id);
+    if (byId) return byId;
+  }
+  return findProduct(line.item || line.product_name);
+}
+
 function validateDocumentLines(document) {
-  if (!document.lines || !Array.isArray(document.lines) || !document.lines.length) {
+  if (!Array.isArray(document.lines) || !document.lines.length) {
     throw new Error('Não é possível postar um documento sem linhas.');
   }
 
   document.lines.forEach((line, index) => {
-    const rowNumber = index + 1;
-
-    if (!line.item || !String(line.item).trim()) {
-      throw new Error(`A linha ${rowNumber} não tem produto definido.`);
+    const row = index + 1;
+    const product = resolveLineProduct(line);
+    if (!line.product_id || !product) {
+      throw new Error(`Linha ${row}: product_id obrigatório e produto deve existir.`);
     }
 
-    const qty = Number(line.quantity);
+    const qty = toNumber(line.quantity ?? line.qty, NaN);
     if (!Number.isFinite(qty) || qty <= 0) {
-      throw new Error(`A linha ${rowNumber} tem quantidade inválida.`);
-    }
-
-    const unitPrice = Number(line.unitPrice);
-    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
-      throw new Error(`A linha ${rowNumber} tem custo/preço unitário inválido.`);
-    }
-
-  const product = resolveLineProduct(line);
-    if (!product) {
-      throw new Error(`Produto não encontrado na linha ${rowNumber}: ${line.item}`);
+      throw new Error(`Linha ${row}: quantidade inválida.`);
     }
   });
 }
 
 function validateDocumentWarehouses(document) {
-  if (document.type === 'Transferência') {
-    const originWarehouse = findWarehouseByName(document.origin);
-    const destinationWarehouse = findWarehouseByName(document.destination);
+  const type = resolveDocumentType(document.type);
+  const typeMeta = DOCUMENT_TYPE_META[type] || DOCUMENT_TYPE_META.stock_transfer;
+  const originWarehouse = findWarehouse(document.origin);
+  const destinationWarehouse = findWarehouse(document.destination);
 
-    if (!originWarehouse) {
-      throw new Error(`Armazém de origem não encontrado: ${document.origin}`);
-    }
-
-    if (!destinationWarehouse) {
-      throw new Error(`Armazém de destino não encontrado: ${document.destination}`);
-    }
-
-    if (originWarehouse.id === destinationWarehouse.id) {
-      throw new Error('A transferência exige armazéns de origem e destino diferentes.');
-    }
+  if (typeMeta.requiresOrigin && !originWarehouse) {
+    throw new Error(`Armazém de origem não encontrado: ${document.origin}`);
   }
 
-  if (document.type === 'Ajuste') {
-    const destinationWarehouse = findWarehouseByName(document.destination);
+  if (typeMeta.requiresDestination && !destinationWarehouse) {
+    throw new Error(`Armazém de destino não encontrado: ${document.destination}`);
+  }
 
-    if (!destinationWarehouse) {
-      throw new Error(`Armazém de destino não encontrado: ${document.destination}`);
-    }
+  if (type === 'stock_transfer' && originWarehouse && destinationWarehouse && originWarehouse.id === destinationWarehouse.id) {
+    throw new Error('A transferência exige armazéns de origem e destino diferentes.');
   }
 }
 
 function validateDocumentStock(document) {
-  if (document.type !== 'Transferência') {
-    return;
-  }
+  const type = resolveDocumentType(document.type);
+  const typeMeta = DOCUMENT_TYPE_META[type] || DOCUMENT_TYPE_META.stock_transfer;
+  if (!typeMeta.checksStockOnOrigin) return;
 
-  const originWarehouse = findWarehouseByName(document.origin);
-
-  if (!originWarehouse) {
-    throw new Error(`Armazém de origem não encontrado: ${document.origin}`);
-  }
+  const originWarehouse = findWarehouse(document.origin);
+  if (!originWarehouse) throw new Error(`Armazém de origem não encontrado: ${document.origin}`);
 
   document.lines.forEach((line, index) => {
-    const rowNumber = index + 1;
-  const product = resolveLineProduct(line);
+    const row = index + 1;
+    const product = resolveLineProduct(line);
+    if (!product) throw new Error(`Produto não encontrado na linha ${row}.`);
 
-    if (!product) {
-      throw new Error(`Produto não encontrado na linha ${rowNumber}: ${line.item}`);
-    }
-
-    const requestedQty = Number(line.quantity) || 0;
+    const requestedQty = toNumber(line.quantity ?? line.qty);
     const availableQty = getAvailableQty(product.id, originWarehouse.id);
-
     if (requestedQty > availableQty) {
-      throw new Error(
-        `Stock insuficiente para ${product.name} no armazém ${originWarehouse.name}. Disponível: ${availableQty}, solicitado: ${requestedQty}.`
-      );
+      throw new Error(`Stock insuficiente para ${product.name} no armazém ${originWarehouse.name}. Disponível: ${availableQty}, solicitado: ${requestedQty}.`);
     }
   });
 }
 
 function validateDocumentBeforePosting(document) {
-  if (!document) {
-    throw new Error('Documento não encontrado.');
-  }
-
-  if (document.status !== 'draft') {
-    throw new Error('Apenas documentos em draft podem ser postados.');
-  }
-
+  if (!document) throw new Error('Documento não encontrado.');
+  if (document.status !== 'draft') throw new Error('Apenas documentos em draft podem ser postados.');
   validateDocumentLines(document);
   validateDocumentWarehouses(document);
   validateDocumentStock(document);
 }
 
-function createStockMove({
-  documentId,
-  date,
-  movementType,
-  direction,
-  productId,
-  warehouseId,
-  qty,
-  unitCost,
-  referenceText = '',
-  isReversal = false,
-}) {
+function createStockMove({ documentId, date, movementType, direction, productId, warehouseId, qty, unitCost, referenceText = '', isReversal = false }) {
   ensureStockStructures();
 
-  const safeQty = Number(qty) || 0;
-  const safeUnitCost = Number(unitCost) || 0;
-
+  const safeQty = toNumber(qty);
+  const safeUnitCost = toNumber(unitCost);
   const balance = getOrCreateStockBalance(productId, warehouseId);
 
   if (direction === 'out') {
-    const currentQty = Number(balance.qty_on_hand || 0);
+    const currentQty = toNumber(balance.qty_on_hand);
     const nextQty = currentQty - safeQty;
-
-    if (nextQty < 0) {
-      throw new Error('Operação bloqueada: o movimento deixaria o stock negativo.');
-    }
-
+    if (nextQty < 0) throw new Error('Operação bloqueada: o movimento deixaria o stock negativo.');
     balance.qty_on_hand = nextQty;
-  } else if (direction === 'in') {
-    const currentQty = Number(balance.qty_on_hand || 0);
-    const currentAvg = Number(balance.avg_unit_cost || 0);
+  }
+
+  if (direction === 'in') {
+    const currentQty = toNumber(balance.qty_on_hand);
+    const currentAvg = toNumber(balance.avg_unit_cost);
     const nextQty = currentQty + safeQty;
-
-    if (nextQty > 0) {
-      balance.avg_unit_cost =
-        ((currentQty * currentAvg) + (safeQty * safeUnitCost)) / nextQty;
-    } else {
-      balance.avg_unit_cost = safeUnitCost;
-    }
-
+    balance.avg_unit_cost = nextQty > 0
+      ? ((currentQty * currentAvg) + (safeQty * safeUnitCost)) / nextQty
+      : safeUnitCost;
     balance.qty_on_hand = nextQty;
   }
 
@@ -436,187 +269,54 @@ function createStockMove({
   };
 
   state.stockMoves.push(move);
-
   return move;
 }
 
 function createStockMovesFromDocument(document, { isReversal = false } = {}) {
-  if (!document) {
-    throw new Error('Documento inválido para geração de movimentos.');
-  }
-
-  const originWarehouse = findWarehouseByName(document.origin);
-  const destinationWarehouse = findWarehouseByName(document.destination);
-
-  const movementDate = isReversal
-    ? new Date().toISOString()
-    : document.postedAt || new Date().toISOString();
+  const type = resolveDocumentType(document.type);
+  const originWarehouse = findWarehouse(document.origin);
+  const destinationWarehouse = findWarehouse(document.destination);
+  const movementDate = isReversal ? new Date().toISOString() : (document.postedAt || new Date().toISOString());
 
   document.lines.forEach((line) => {
-const product = resolveLineProduct(line);
+    const product = resolveLineProduct(line);
+    if (!product) throw new Error('Produto inválido na linha do documento.');
 
-    if (!product) {
-      throw new Error(`Produto não encontrado para a linha: ${line.item}`);
+    const qty = toNumber(line.quantity ?? line.qty);
+    const unitCost = toNumber(line.unitPrice ?? line.unit_cost ?? line.unit_price);
+    const referenceText = `${isReversal ? 'Reversão' : 'Documento'} ${document.number}`;
+
+    if (type === 'stock_transfer') {
+      createStockMove({ documentId: document.id, date: movementDate, movementType: isReversal ? 'transfer_reversal_in' : 'transfer_out', direction: isReversal ? 'in' : 'out', productId: product.id, warehouseId: originWarehouse.id, qty, unitCost, referenceText, isReversal });
+      createStockMove({ documentId: document.id, date: movementDate, movementType: isReversal ? 'transfer_reversal_out' : 'transfer_in', direction: isReversal ? 'out' : 'in', productId: product.id, warehouseId: destinationWarehouse.id, qty, unitCost, referenceText, isReversal });
+      return;
     }
 
-    const qty = Number(line.quantity) || 0;
-    const unitCost = Number(line.unitPrice) || 0;
-
-    if (document.type === 'Transferência') {
-      if (!originWarehouse) {
-        throw new Error(`Armazém de origem não encontrado: ${document.origin}`);
-      }
-
-      if (!destinationWarehouse) {
-        throw new Error(`Armazém de destino não encontrado: ${document.destination}`);
-      }
-
-      if (!isReversal) {
-        createStockMove({
-          documentId: document.id,
-          date: movementDate,
-          movementType: 'transfer_out',
-          direction: 'out',
-          productId: product.id,
-          warehouseId: originWarehouse.id,
-          qty,
-          unitCost,
-          referenceText: `Transferência ${document.number}`,
-        });
-
-        createStockMove({
-          documentId: document.id,
-          date: movementDate,
-          movementType: 'transfer_in',
-          direction: 'in',
-          productId: product.id,
-          warehouseId: destinationWarehouse.id,
-          qty,
-          unitCost,
-          referenceText: `Transferência ${document.number}`,
-        });
-      } else {
-        createStockMove({
-          documentId: document.id,
-          date: movementDate,
-          movementType: 'transfer_reversal_in',
-          direction: 'in',
-          productId: product.id,
-          warehouseId: originWarehouse.id,
-          qty,
-          unitCost,
-          referenceText: `Reversão ${document.number}`,
-          isReversal: true,
-        });
-
-        createStockMove({
-          documentId: document.id,
-          date: movementDate,
-          movementType: 'transfer_reversal_out',
-          direction: 'out',
-          productId: product.id,
-          warehouseId: destinationWarehouse.id,
-          qty,
-          unitCost,
-          referenceText: `Reversão ${document.number}`,
-          isReversal: true,
-        });
-      }
+    if (type === 'stock_entry') {
+      createStockMove({ documentId: document.id, date: movementDate, movementType: isReversal ? 'entry_reversal_out' : 'entry_in', direction: isReversal ? 'out' : 'in', productId: product.id, warehouseId: destinationWarehouse.id, qty, unitCost, referenceText, isReversal });
+      return;
     }
 
-    if (document.type === 'Ajuste') {
-      if (!destinationWarehouse) {
-        throw new Error(`Armazém de destino não encontrado: ${document.destination}`);
-      }
-
-      if (!isReversal) {
-        createStockMove({
-          documentId: document.id,
-          date: movementDate,
-          movementType: 'adjustment_in',
-          direction: 'in',
-          productId: product.id,
-          warehouseId: destinationWarehouse.id,
-          qty,
-          unitCost,
-          referenceText: `Ajuste ${document.number}`,
-        });
-      } else {
-        createStockMove({
-          documentId: document.id,
-          date: movementDate,
-          movementType: 'adjustment_reversal_out',
-          direction: 'out',
-          productId: product.id,
-          warehouseId: destinationWarehouse.id,
-          qty,
-          unitCost,
-          referenceText: `Reversão ${document.number}`,
-          isReversal: true,
-        });
-      }
+    if (type === 'stock_exit') {
+      createStockMove({ documentId: document.id, date: movementDate, movementType: isReversal ? 'exit_reversal_in' : 'exit_out', direction: isReversal ? 'in' : 'out', productId: product.id, warehouseId: originWarehouse.id, qty, unitCost, referenceText, isReversal });
+      return;
     }
+
+    if (type === 'stock_return') {
+      createStockMove({ documentId: document.id, date: movementDate, movementType: isReversal ? 'return_reversal_out' : 'return_in', direction: isReversal ? 'out' : 'in', productId: product.id, warehouseId: destinationWarehouse.id, qty, unitCost, referenceText, isReversal });
+      return;
+    }
+
+    // stock_adjustment
+    createStockMove({ documentId: document.id, date: movementDate, movementType: isReversal ? 'adjustment_reversal_out' : 'adjustment_in', direction: isReversal ? 'out' : 'in', productId: product.id, warehouseId: destinationWarehouse.id, qty, unitCost, referenceText, isReversal });
   });
-}
-
-function getProductLabel(product, fallback = '') {
-  if (!product) return fallback || 'Produto desconhecido';
-  return product.name || product.sku || product.id || fallback || 'Produto';
 }
 
 function getDraftDocumentOrThrow(documentId) {
   const document = getDocumentById(documentId);
-
-  if (!document) {
-    throw new Error('Documento não encontrado.');
-  }
-
-  if (document.status !== 'draft') {
-    throw new Error('Apenas documentos em draft podem ser alterados.');
-  }
-
+  if (!document) throw new Error('Documento não encontrado.');
+  if (document.status !== 'draft') throw new Error('Apenas documentos em draft podem ser alterados.');
   return document;
-}
-
-function createDocumentLine({ product_id = '', item, quantity, unitPrice }) {
-  const safeQuantity = Number(quantity) || 0;
-  const safeUnitPrice = Number(unitPrice) || 0;
-
-  let resolvedItem = item || '';
-
-  if (product_id) {
-    const product = findProductById(product_id);
-    if (product) {
-      resolvedItem = product.name;
-    }
-  }
-
-  return {
-    id: crypto.randomUUID(),
-    product_id,
-    item: resolvedItem,
-    quantity: safeQuantity,
-    unitPrice: safeUnitPrice,
-    total: calculateLineTotal(safeQuantity, safeUnitPrice),
-  };
-}
-
-function calculateLineTotal(quantity, unitPrice) {
-  return Number(quantity) * Number(unitPrice);
-}
-
-function recalculateDocumentTotals(document) {
-  const linesCount = document.lines.length;
-  const grandTotal = document.lines.reduce((sum, line) => {
-    return sum + Number(line.total || 0);
-  }, 0);
-
-  document.totals = {
-    linesCount,
-    grandTotal,
-  };
-
-  return document.totals;
 }
 
 function generateDocumentNumber() {
@@ -624,9 +324,50 @@ function generateDocumentNumber() {
   return `DOC-${String(nextNumber).padStart(4, '0')}`;
 }
 
-// ==============================
-// EXPORTS
-// ==============================
+function buildDocument(data = {}) {
+  return {
+    id: data.id || crypto.randomUUID(),
+    company_id: data.company_id || data.companyId || 'default-company',
+    number: data.number || generateDocumentNumber(),
+    date: data.date || new Date().toISOString().slice(0, 10),
+    type: resolveDocumentType(data.type),
+    status: data.status || 'draft',
+    origin: data.origin || '',
+    destination: data.destination || '',
+    notes: data.notes || '',
+    created_at: data.created_at || new Date().toISOString(),
+    postedAt: data.postedAt || null,
+    cancelledAt: data.cancelledAt || null,
+    cancelReason: data.cancelReason || '',
+    lines: [],
+    totals: { linesCount: 0, grandTotal: 0 },
+  };
+}
+
+function seedDocuments() {
+  if (state.documents.length) return;
+
+  const docDraft = buildDocument({ number: 'DOC-0001', date: '2026-03-25', type: 'stock_transfer', origin: 'Armazém Central', destination: 'Loja 1' });
+  docDraft.lines = [
+    createDocumentLine({ product_id: 'p1', quantity: 2, unitPrice: 1500 }),
+    createDocumentLine({ product_id: 'p2', quantity: 1, unitPrice: 2500 }),
+  ];
+  docDraft.lines.forEach((line) => {
+    line.document_id = docDraft.id;
+  });
+  recalculateDocumentTotals(docDraft);
+
+  const docPosted = buildDocument({ number: 'DOC-0002', date: '2026-03-24', type: 'stock_adjustment', destination: 'Stock Interno', status: 'posted', postedAt: '2026-03-24T10:30:00' });
+  docPosted.lines = [createDocumentLine({ product_id: 'p3', quantity: 3, unitPrice: 900 })];
+  docPosted.lines.forEach((line) => {
+    line.document_id = docPosted.id;
+  });
+  recalculateDocumentTotals(docPosted);
+
+  state.documents.push(docDraft, docPosted);
+}
+
+seedDocuments();
 
 export function getState() {
   return state;
@@ -638,43 +379,20 @@ export function getDocuments() {
 
 export function searchDocuments({ query = '', status = '', sortBy = 'date_desc' } = {}) {
   let results = [...state.documents];
+  const q = normalizeText(query);
 
-  if (query) {
-    const q = query.toLowerCase();
-
-    results = results.filter((documentData) =>
-      documentData.number.toLowerCase().includes(q) ||
-      documentData.type.toLowerCase().includes(q) ||
-      (documentData.origin || '').toLowerCase().includes(q) ||
-      (documentData.destination || '').toLowerCase().includes(q)
-    );
+  if (q) {
+    results = results.filter((doc) => [doc.number, doc.type, doc.origin, doc.destination, doc.notes].some((value) => normalizeText(value).includes(q)));
   }
 
   if (status) {
-    results = results.filter((documentData) => documentData.status === status);
+    results = results.filter((doc) => doc.status === status);
   }
 
-  switch (sortBy) {
-    case 'date_desc':
-      results.sort((a, b) => new Date(b.date) - new Date(a.date));
-      break;
-
-    case 'date_asc':
-      results.sort((a, b) => new Date(a.date) - new Date(b.date));
-      break;
-
-    case 'number_asc':
-      results.sort((a, b) => a.number.localeCompare(b.number));
-      break;
-
-    case 'number_desc':
-      results.sort((a, b) => b.number.localeCompare(a.number));
-      break;
-
-    default:
-      results.sort((a, b) => new Date(b.date) - new Date(a.date));
-      break;
-  }
+  if (sortBy === 'date_asc') results.sort((a, b) => new Date(a.date) - new Date(b.date));
+  else if (sortBy === 'number_asc') results.sort((a, b) => a.number.localeCompare(b.number));
+  else if (sortBy === 'number_desc') results.sort((a, b) => b.number.localeCompare(a.number));
+  else results.sort((a, b) => new Date(b.date) - new Date(a.date));
 
   return results;
 }
@@ -684,24 +402,7 @@ export function getDocumentById(id) {
 }
 
 export function createDocument(data) {
-  const newDocument = {
-    id: crypto.randomUUID(),
-    number: generateDocumentNumber(),
-    date: data.date,
-    type: data.type,
-    origin: data.origin,
-    destination: data.destination,
-    status: 'draft',
-    lines: [],
-    totals: {
-      linesCount: 0,
-      grandTotal: 0,
-    },
-    postedAt: null,
-    cancelledAt: null,
-    cancelReason: '',
-  };
-
+  const newDocument = buildDocument(data);
   state.documents.unshift(newDocument);
   return newDocument;
 }
@@ -709,93 +410,75 @@ export function createDocument(data) {
 export function updateDocument(id, data) {
   const document = getDraftDocumentOrThrow(id);
 
+  document.company_id = data.company_id || data.companyId || document.company_id;
   document.date = data.date;
-  document.type = data.type;
-  document.origin = data.origin;
-  document.destination = data.destination;
+  document.type = resolveDocumentType(data.type);
+  document.origin = data.origin || '';
+  document.destination = data.destination || '';
+  document.notes = data.notes || '';
 
   return document;
 }
 
 export function addDocumentLine(documentId, lineData) {
   const document = getDraftDocumentOrThrow(documentId);
+  const newLine = createDocumentLine({
+    product_id: lineData.product_id || '',
+    item: lineData.item,
+    quantity: toNumber(lineData.quantity),
+    unitPrice: toNumber(lineData.unitPrice ?? lineData.unit_cost ?? lineData.unit_price),
+  });
 
-const newLine = createDocumentLine({
-  product_id: lineData.product_id || '',
-  item: lineData.item,
-  quantity: Number(lineData.quantity),
-  unitPrice: Number(lineData.unitPrice),
-});
-
+  newLine.document_id = document.id;
   document.lines.push(newLine);
   recalculateDocumentTotals(document);
-
   return newLine;
 }
 
 export function updateDocumentLine(documentId, lineId, lineData) {
   const document = getDraftDocumentOrThrow(documentId);
-
   const line = document.lines.find((entry) => entry.id === lineId);
+  if (!line) throw new Error('Linha não encontrada.');
 
-  if (!line) {
-    throw new Error('Linha não encontrada.');
-  }
-
-line.product_id = lineData.product_id || '';
-
-if (line.product_id) {
-  const product = findProductById(line.product_id);
+  const product = findProductById(lineData.product_id || line.product_id);
+  line.product_id = product?.id || lineData.product_id || '';
   line.item = product?.name || lineData.item || '';
-} else {
-  line.item = lineData.item || '';
-}
-
-line.quantity = Number(lineData.quantity);
-line.unitPrice = Number(lineData.unitPrice);
-line.total = calculateLineTotal(line.quantity, line.unitPrice);
+  line.product_code = product?.sku || '';
+  line.product_name = product?.name || line.item;
+  line.quantity = toNumber(lineData.quantity);
+  line.qty = line.quantity;
+  line.unitPrice = toNumber(lineData.unitPrice);
+  line.unit_cost = line.unitPrice;
+  line.unit_price = line.unitPrice;
+  line.total = calculateLineTotal(line.quantity, line.unitPrice);
+  line.line_total = line.total;
 
   recalculateDocumentTotals(document);
-
   return line;
 }
 
 export function removeDocumentLine(documentId, lineId) {
   const document = getDraftDocumentOrThrow(documentId);
-
   document.lines = document.lines.filter((entry) => entry.id !== lineId);
   recalculateDocumentTotals(document);
 }
 
 export function getDocumentLines(documentId) {
   const document = getDocumentById(documentId);
-
-  if (!document) return [];
-
-  return [...document.lines];
+  return document ? [...document.lines] : [];
 }
 
 export function getDocumentTotals(documentId) {
   const document = getDocumentById(documentId);
-
-  if (!document) {
-    return {
-      linesCount: 0,
-      grandTotal: 0,
-    };
-  }
-
-  return { ...document.totals };
+  return document ? { ...document.totals } : { linesCount: 0, grandTotal: 0 };
 }
 
 export function postDocument(documentId) {
   const document = getDocumentById(documentId);
-
   validateDocumentBeforePosting(document);
 
   document.status = 'posted';
   document.postedAt = new Date().toISOString();
-
   createStockMovesFromDocument(document);
 
   return document;
@@ -803,21 +486,15 @@ export function postDocument(documentId) {
 
 export function cancelDocument(documentId, reason = '') {
   const document = getDocumentById(documentId);
-
-  if (!document) {
-    throw new Error('Documento não encontrado.');
-  }
-
-  if (document.status !== 'posted') {
-    throw new Error('Apenas documentos em posted podem ser cancelados.');
-  }
+  if (!document) throw new Error('Documento não encontrado.');
+  if (document.status === 'cancelled') throw new Error('Documento já está cancelado.');
+  if (document.status !== 'posted') throw new Error('Apenas documentos em posted podem ser cancelados.');
 
   document.status = 'cancelled';
   document.cancelledAt = new Date().toISOString();
   document.cancelReason = reason?.trim() || 'Sem motivo informado.';
 
   createStockMovesFromDocument(document, { isReversal: true });
-
   return document;
 }
 

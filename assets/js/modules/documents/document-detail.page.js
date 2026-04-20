@@ -85,8 +85,9 @@ export async function renderDocumentDetailPage() {
           </div>
           <div class="card-body" style="display:grid;gap:10px;">
             <div><strong>Número:</strong> ${documentData.number || '—'}</div>
-            <div><strong>Tipo:</strong> ${documentData.type || '—'}</div>
+            <div><strong>Tipo:</strong> ${documentData.type_label || documentData.type || '—'}</div>
             <div><strong>Status:</strong> ${renderStatusBadge(documentData.status)}</div>
+            <div><strong>Empresa:</strong> ${documentData.company_id || '—'}</div>
             <div><strong>Data:</strong> ${formatDate(documentData.date)}</div>
             <div><strong>Referência:</strong> ${documentData.reference || '—'}</div>
             <div><strong>Origem:</strong> ${documentData.origin || '—'}</div>
@@ -100,11 +101,10 @@ export async function renderDocumentDetailPage() {
           </div>
           <div class="card-body" style="display:grid;gap:10px;">
             <div><strong>Lançado em:</strong> ${formatDate(documentData.postedAt)}</div>
+            <div><strong>Criado em:</strong> ${formatDate(documentData.createdAt)}</div>
             <div><strong>Cancelado em:</strong> ${formatDate(documentData.cancelledAt)}</div>
             <div><strong>Motivo de cancelamento:</strong> ${documentData.cancelReason || '—'}</div>
-            <div><strong>Criado em:</strong> ${formatDate(documentData.createdAt)}</div>
-            <div><strong>Actualizado em:</strong> ${formatDate(documentData.updatedAt)}</div>
-            <div><strong>Observações:</strong> ${documentData.notes || '—'}</div>
+                        <div><strong>Observações:</strong> ${documentData.notes || '—'}</div>
           </div>
         </div>
       </div>
@@ -119,11 +119,9 @@ export async function renderDocumentDetailPage() {
             <thead>
               <tr>
                 <th>Código</th>
-                <th>Item</th>
-                <th>Descrição</th>
+                <th>Produto</th>
                 <th>Qtd</th>
-                <th>Un</th>
-                <th>Preço Unit.</th>
+                <th>Custo/Preço Unit.</th>
                 <th>Total</th>
               </tr>
             </thead>
@@ -134,20 +132,18 @@ export async function renderDocumentDetailPage() {
                       .map(
                         (line) => `
                           <tr>
-                            <td>${line.itemCode || '—'}</td>
-                            <td>${line.itemName || '—'}</td>
-                            <td>${line.description || '—'}</td>
-                            <td>${line.quantity}</td>
-                            <td>${line.unit || '—'}</td>
-                            <td>${formatMoney(line.unitPrice)}</td>
-                            <td>${formatMoney(line.total)}</td>
+                            <td>${line.product_code || line.itemCode || '—'}</td>
+                            <td>${line.product_name || line.itemName || '—'}</td>
+                            <td>${line.qty ?? line.quantity}</td>
+                            <td>${formatMoney(line.unit_cost ?? line.unitPrice)}</td>
+                            <td>${formatMoney(line.line_total ?? line.total)}</td>
                           </tr>
                         `
                       )
                       .join('')
                   : `
                     <tr>
-                      <td colspan="7" style="text-align:center;">Sem linhas registadas.</td>
+                      <td colspan="5" style="text-align:center;">Sem linhas registadas.</td>
                     </tr>
                   `
               }
