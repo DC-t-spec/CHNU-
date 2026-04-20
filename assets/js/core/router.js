@@ -95,62 +95,34 @@ function updateSidebarActiveState(route = '') {
   const sidebarLinks = document.querySelectorAll('.sidebar__link, .nav-link, .sidebar a');
   if (!sidebarLinks.length) return;
 
+  const routeByTarget = {
+    '#dashboard': ['/dashboard'],
+    '#documents': ['/documents', '/documents/view', '/documents/edit', '/documents/new'],
+    '#sales': ['/sales', '/sales/new', '/sales/edit', '/sales/view'],
+    '#purchases': ['/purchases', '/purchases/new', '/purchases/edit', '/purchases/view'],
+    '#inventory-balances': ['/inventory-balances', '/inventory'],
+    '#inventory-ledger': ['/inventory-ledger'],
+    '#products': ['/products', '/products/new', '/products/edit/:id'],
+    '#reports': ['/reports'],
+    '#reports-stock': ['/reports-stock'],
+    '#reports-movements': ['/reports-movements'],
+  };
+
+  function routeMatches(candidate = '', current = '') {
+    if (!candidate || !current) return false;
+    if (candidate.includes('/:')) {
+      const base = candidate.split('/:')[0];
+      return current.startsWith(base);
+    }
+    return current === candidate;
+  }
+
   sidebarLinks.forEach((link) => {
     link.classList.remove('active');
-
     const target = link.getAttribute('href');
-    if (!target) return;
+    const candidates = routeByTarget[target] || [];
 
-    if (target === '#dashboard' && route === '/dashboard') {
-      link.classList.add('active');
-      return;
-    }
-
-    if (target === '#documents' && route.startsWith('/documents') && route !== '/documents/new') {
-      link.classList.add('active');
-      return;
-    }
-
-    if (target === '#documents/new' && route === '/documents/new') {
-      link.classList.add('active');
-      return;
-    }
-
-    if (target === '#sales' && route.startsWith('/sales')) {
-      link.classList.add('active');
-      return;
-    }
-
-    if (target === '#purchases' && route.startsWith('/purchases')) {
-      link.classList.add('active');
-      return;
-    }
-
-    if (target === '#inventory' && route === '/inventory') {
-      link.classList.add('active');
-      return;
-    }
-
-    if (target === '#inventory-balances' && route === '/inventory-balances') {
-      link.classList.add('active');
-      return;
-    }
-
-    if (target === '#inventory-ledger' && route === '/inventory-ledger') {
-      link.classList.add('active');
-      return;
-    }
-
-    if (target === '#products' && route.startsWith('/products')) {
-      link.classList.add('active');
-      return;
-    }
-
-    if (
-      (target === '#reports' && route === '/reports') ||
-      (target === '#reports-stock' && route === '/reports-stock') ||
-      (target === '#reports-movements' && route === '/reports-movements')
-    ) {
+    if (candidates.some((candidate) => routeMatches(candidate, route))) {
       link.classList.add('active');
     }
   });
