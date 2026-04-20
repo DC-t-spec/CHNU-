@@ -1,4 +1,4 @@
-import { getInventoryBalancesPageData } from '../../services/inventory.service.js';
+import { getInventoryBalancesPageData, syncInventoryProducts } from '../../services/inventory.service.js';
 import {
   getInventoryPageFilters,
   updateInventoryPageFilters,
@@ -242,6 +242,8 @@ export async function renderInventoryBalancesPage() {
     sortBy: 'product_asc',
     page: 1,
   });
+
+  await syncInventoryProducts();
 
   const { summary, items, pagination } = getInventoryBalancesPageData({
     query: filters.query,

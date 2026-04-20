@@ -1,20 +1,20 @@
 import {
   getDocumentById,
   saveDocument,
-  getProducts,
   getWarehouses,
   getDocumentTypeOptions,
 } from '../../services/documents.service.js';
 import { showToast } from '../../ui/toast.js';
 import { assertEditableDocument } from '../../services/document-status.service.js';
 import { initDocumentLines } from './document-lines.js';
+import { listProductsAsync } from '../../services/products.service.js';
 
 export async function renderDocumentFormPage(context = {}) {
   const appRoot = document.querySelector('#app');
   if (!appRoot) return;
 
   const documentId = context?.params?.id || context?.query?.id || null;
-  const products = getProducts();
+  const products = await listProductsAsync();
   const warehouses = getWarehouses();
   const typeOptions = getDocumentTypeOptions();
   const existing = documentId ? getDocumentById(documentId) : null;

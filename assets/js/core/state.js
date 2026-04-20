@@ -197,9 +197,8 @@ function validateDocumentLines(document) {
 
   document.lines.forEach((line, index) => {
     const row = index + 1;
-    const product = resolveLineProduct(line);
-    if (!line.product_id || !product) {
-      throw new Error(`Linha ${row}: product_id obrigatório e produto deve existir.`);
+    if (!line.product_id) {
+      throw new Error(`Linha ${row}: product_id obrigatório.`);
     }
 
     const qty = toNumber(line.quantity ?? line.qty, NaN);
@@ -238,8 +237,10 @@ function validateDocumentStock(document) {
 
   document.lines.forEach((line, index) => {
     const row = index + 1;
-    const product = resolveLineProduct(line);
-    if (!product) throw new Error(`Produto não encontrado na linha ${row}.`);
+    const product = resolveLineProduct(line) || {
+      id: line.product_id,
+      name: line.product_name || line.item || `Produto ${row}`,
+    };
 
     const requestedQty = toNumber(line.quantity ?? line.qty);
     const availableQty = getAvailableQty(product.id, originWarehouse.id);
@@ -315,8 +316,11 @@ function createStockMovesFromDocument(document, { isReversal = false } = {}) {
   const movementDate = isReversal ? new Date().toISOString() : (document.postedAt || new Date().toISOString());
 
   document.lines.forEach((line) => {
-    const product = resolveLineProduct(line);
-    if (!product) throw new Error('Produto inválido na linha do documento.');
+    const product = resolveLineProduct(line) || {
+      id: line.product_id,
+      name: line.product_name || line.item || 'Produto',
+    };
+    if (!product.id) throw new Error('Produto inválido na linha do documento.');
 
     const qty = toNumber(line.quantity ?? line.qty);
     const unitCost = toNumber(line.unitPrice ?? line.unit_cost ?? line.unit_price);

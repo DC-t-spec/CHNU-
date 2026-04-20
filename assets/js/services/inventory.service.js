@@ -1,10 +1,34 @@
 import {
-  getProducts,
+  getProducts as getProductsFromState,
   getWarehouses,
   getStockBalances,
   getStockMoves,
   getDocuments,
 } from '../core/state.js';
+import { listProductsAsync } from './products.service.js';
+
+
+
+let productsCatalogCache = null;
+
+export async function syncInventoryProducts() {
+  try {
+    const products = await listProductsAsync();
+    productsCatalogCache = Array.isArray(products) ? products : [];
+  } catch {
+    productsCatalogCache = null;
+  }
+
+  return productsCatalogCache || [];
+}
+
+function getInventoryProductsCatalog() {
+  if (Array.isArray(productsCatalogCache) && productsCatalogCache.length) {
+    return productsCatalogCache;
+  }
+
+  return getProductsFromState?.() || [];
+}
 
 function safeNumber(value, fallback = 0) {
   const num = Number(value);
@@ -146,7 +170,7 @@ function matchesText(row, query) {
 
 export function getInventoryBalances() {
   const balances = getStockBalances?.() || [];
-  const products = getProducts?.() || [];
+  const products = getInventoryProductsCatalog();
   const warehouses = getWarehouses?.() || [];
 
   const productsMap = new Map(products.map((item) => [item.id, item]));
@@ -165,7 +189,7 @@ export function getInventoryBalances() {
 
 export function getInventoryLedger() {
   const stockMoves = getStockMoves?.() || [];
-  const products = getProducts?.() || [];
+  const products = getInventoryProductsCatalog();
   const warehouses = getWarehouses?.() || [];
   const documents = getDocuments?.() || [];
 

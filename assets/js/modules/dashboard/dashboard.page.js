@@ -298,7 +298,7 @@ export async function renderDashboardPage() {
   const appRoot = document.querySelector('#app');
   if (!appRoot) return;
 
-  const data = getDashboardExecutiveData();
+  const data = await getDashboardExecutiveData();
 
   appRoot.innerHTML = `
     <section class="page-shell dashboard-page">

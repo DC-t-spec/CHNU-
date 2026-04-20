@@ -4,6 +4,7 @@ import {
   getInventoryBalanceSummary,
   getInventoryBalances,
   getInventoryLedger,
+  syncInventoryProducts,
 } from './inventory.service.js';
 
 function safeArray(value) {
@@ -37,8 +38,10 @@ function sumBy(items, mapper) {
   return safeArray(items).reduce((sum, item) => sum + safeNumber(mapper(item)), 0);
 }
 
-export function getDashboardExecutiveData() {
-  const products = safeArray(listProducts?.());
+export async function getDashboardExecutiveData() {
+  await syncInventoryProducts();
+
+  const products = safeArray(await Promise.resolve(listProducts?.()));
   const documents = safeArray(listDocuments?.({}) || []);
 
   const inventorySummary = getInventoryBalanceSummary?.() || {

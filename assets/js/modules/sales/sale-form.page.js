@@ -1,14 +1,14 @@
 import {
   getDocumentById,
   saveDocument,
-  getProducts,
   getWarehouses,
   getCustomers,
 } from '../../services/documents.service.js';
-import { getInventoryBalances } from '../../services/inventory.service.js';
+import { getInventoryBalances, syncInventoryProducts } from '../../services/inventory.service.js';
 import { assertEditableDocument } from '../../services/document-status.service.js';
 import { showToast } from '../../ui/toast.js';
 import { initDocumentLines } from '../documents/document-lines.js';
+import { listProductsAsync } from '../../services/products.service.js';
 
 function escapeHtml(value) {
   return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
@@ -43,9 +43,10 @@ export async function renderSaleFormPage(context = {}) {
     }
   }
 
-  const products = getProducts();
+  const products = await listProductsAsync();
   const warehouses = getWarehouses();
   const customers = getCustomers();
+  await syncInventoryProducts();
   const stockBalances = getInventoryBalances();
 
   const initialLines = existing?.lines?.length
