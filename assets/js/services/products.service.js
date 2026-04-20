@@ -3,6 +3,7 @@ import {
   createProduct as createProductFromProvider,
   getById as getProductByIdFromProvider,
   listProducts as listProductsFromProvider,
+  toggleActive as toggleProductActiveFromProvider,
   update as updateProductFromProvider,
 } from './providers/products.provider.js';
 
@@ -231,4 +232,16 @@ export async function updateProduct(id, payload = {}) {
   }
 
   return updateProductFromProvider(id, normalizedPayload);
+}
+
+export async function toggleProductActive(id, currentState) {
+  if (!id) {
+    throw new Error('ID do produto é obrigatório para atualização.');
+  }
+
+  if (typeof toggleProductActiveFromProvider !== 'function') {
+    throw new Error('Provider de produtos indisponível para atualizar estado.');
+  }
+
+  return toggleProductActiveFromProvider(id, currentState);
 }

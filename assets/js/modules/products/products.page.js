@@ -1,4 +1,4 @@
-import { listProductsAsync } from '../../services/products.service.js';
+import { listProductsAsync, toggleProductActive } from '../../services/products.service.js';
 import { navigateTo } from '../../core/router.js';
 
 function escapeHtml(value) {
@@ -22,6 +22,7 @@ function normalizeProduct(product, index) {
     id: product.id ?? '',
     code: product.code ?? product.sku ?? product.product_code ?? `PRD-${index + 1}`,
     name: product.name ?? product.description ?? product.itemName ?? '—',
+    is_active: product.is_active ?? true,
     unitPrice:
       product.unitPrice ??
       product.unit_price ??
@@ -50,6 +51,15 @@ function renderProductsRows(rows) {
           <td style="text-align:right;">${formatCurrency(row.unitPrice)}</td>
           <td style="text-align:right;">
             <button type="button" class="btn btn-secondary btn-edit-product" data-product-id="${escapeHtml(row.id)}" ${row.id ? '' : 'disabled'}>Editar</button>
+            <button
+              type="button"
+              class="btn ${row.is_active ? 'btn-danger' : 'btn-primary'} btn-toggle-product-active"
+              data-product-id="${escapeHtml(row.id)}"
+              data-is-active="${row.is_active ? 'true' : 'false'}"
+              ${row.id ? '' : 'disabled'}
+            >
+              ${row.is_active ? 'Desativar' : 'Ativar'}
+            </button>
           </td>
         </tr>
       `
@@ -97,11 +107,41 @@ export async function renderProductsPage() {
     </section>
   `;
 
-  app.querySelectorAll('.btn-edit-product').forEach((button) => {
-    button.addEventListener('click', () => {
-      const productId = button.getAttribute('data-product-id');
-      if (!productId) return;
-      navigateTo(`/products/edit/${productId}`);
+  const tableBody = app.querySelector('tbody');
+  if (!tableBody) return;
+
+  function attachRowEvents() {
+    app.querySelectorAll('.btn-edit-product').forEach((button) => {
+      button.addEventListener('click', () => {
+        const productId = button.getAttribute('data-product-id');
+        if (!productId) return;
+        navigateTo(`/products/edit/${productId}`);
+      });
     });
-  });
+
+    app.querySelectorAll('.btn-toggle-product-active').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const productId = button.getAttribute('data-product-id');
+        const isActive = button.getAttribute('data-is-active') === 'true';
+
+        if (!productId) return;
+
+        button.disabled = true;
+        try {
+          const updatedProduct = await toggleProductActive(productId, isActive);
+          const rowIndex = rows.findIndex((row) => String(row.id) === String(productId));
+
+          if (rowIndex >= 0) {
+            rows[rowIndex] = normalizeProduct(updatedProduct, rowIndex);
+            tableBody.innerHTML = renderProductsRows(rows);
+            attachRowEvents();
+          }
+        } catch {
+          button.disabled = false;
+        }
+      });
+    });
+  }
+
+  attachRowEvents();
 }

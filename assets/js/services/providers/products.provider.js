@@ -263,6 +263,33 @@ export async function update(id, payload = {}) {
   return normalizeProduct(data);
 }
 
+export async function toggleActive(id, is_active) {
+  if (!id) {
+    throw new Error('ID do produto é obrigatório para atualização.');
+  }
+
+  const client = getSupabaseClientSafe();
+  if (!client) {
+    throw new Error('Supabase não está configurado para atualizar produtos.');
+  }
+
+  const nextState = !Boolean(is_active);
+
+  const { data, error } = await client
+    .from('products')
+    .update({ is_active: nextState })
+    .eq('id', id)
+    .select('*')
+    .maybeSingle();
+
+  if (error || !data) {
+    const message = error?.message?.trim() || 'Erro ao atualizar estado do produto no Supabase.';
+    throw new Error(message);
+  }
+
+  return normalizeProduct(data);
+}
+
 export async function createProduct(payload) {
   return createProductInSupabase(payload);
 }
