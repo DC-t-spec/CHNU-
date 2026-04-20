@@ -1,4 +1,5 @@
 import { listProductsAsync } from '../../services/products.service.js';
+import { navigateTo } from '../../core/router.js';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -18,6 +19,7 @@ function formatCurrency(value) {
 
 function normalizeProduct(product, index) {
   return {
+    id: product.id ?? '',
     code: product.code ?? product.sku ?? product.product_code ?? `PRD-${index + 1}`,
     name: product.name ?? product.description ?? product.itemName ?? '—',
     unitPrice:
@@ -34,7 +36,7 @@ function renderProductsRows(rows) {
   if (!rows.length) {
     return `
       <tr>
-        <td colspan="3" style="text-align:center;">Sem produtos disponíveis.</td>
+        <td colspan="4" style="text-align:center;">Sem produtos disponíveis.</td>
       </tr>
     `;
   }
@@ -42,10 +44,13 @@ function renderProductsRows(rows) {
   return rows
     .map(
       (row) => `
-        <tr>
+        <tr data-product-id="${escapeHtml(row.id)}">
           <td>${escapeHtml(row.code)}</td>
           <td>${escapeHtml(row.name)}</td>
           <td style="text-align:right;">${formatCurrency(row.unitPrice)}</td>
+          <td style="text-align:right;">
+            <button type="button" class="btn btn-secondary btn-edit-product" data-product-id="${escapeHtml(row.id)}" ${row.id ? '' : 'disabled'}>Editar</button>
+          </td>
         </tr>
       `
     )
@@ -80,6 +85,7 @@ export async function renderProductsPage() {
                 <th>Code</th>
                 <th>Name</th>
                 <th style="text-align:right;">Unit price</th>
+                <th style="text-align:right;">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -90,4 +96,12 @@ export async function renderProductsPage() {
       </div>
     </section>
   `;
+
+  app.querySelectorAll('.btn-edit-product').forEach((button) => {
+    button.addEventListener('click', () => {
+      const productId = button.getAttribute('data-product-id');
+      if (!productId) return;
+      navigateTo(`/products/edit/${productId}`);
+    });
+  });
 }
