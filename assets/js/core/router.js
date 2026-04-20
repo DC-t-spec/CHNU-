@@ -133,6 +133,15 @@ function updateSidebarActiveState(route = '') {
 
     if (target === '#products' && route.startsWith('/products')) {
       link.classList.add('active');
+      return;
+    }
+
+    if (
+      (target === '#reports' && route === '/reports') ||
+      (target === '#reports-stock' && route === '/reports-stock') ||
+      (target === '#reports-movements' && route === '/reports-movements')
+    ) {
+      link.classList.add('active');
     }
   });
 }

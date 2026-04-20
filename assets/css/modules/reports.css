@@ -1,0 +1,41 @@
+.reports-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.reports-kpis-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.reports-section-card .card {
+  padding: 0;
+}
+
+.reports-table thead th {
+  white-space: nowrap;
+}
+
+.reports-table .table-meta {
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+}
+
+.reports-movements-toolbar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .reports-movements-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .reports-movements-toolbar {
+    grid-template-columns: 1fr;
+  }
+}
