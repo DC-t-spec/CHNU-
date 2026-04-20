@@ -72,7 +72,11 @@ export async function renderProductsPage() {
   if (!app) return;
 
   const products = await listProductsAsync();
-  const rows = (Array.isArray(products) ? products : []).map(normalizeProduct);
+  const allRows = (Array.isArray(products) ? products : []).map(normalizeProduct);
+  let filteredRows = [...allRows];
+  let searchTerm = '';
+  let statusFilter = 'all';
+  let debounceTimer;
 
   app.innerHTML = `
     <section class="page-shell products-page">
@@ -88,6 +92,23 @@ export async function renderProductsPage() {
       </div>
 
       <div class="card" style="margin-top:16px;">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:16px 16px 0 16px;">
+          <input
+            type="search"
+            class="input"
+            id="products-search"
+            placeholder="Pesquisar por code ou name"
+            autocomplete="off"
+            style="min-width:240px;flex:1;"
+          />
+
+          <select id="products-status-filter" class="input" style="max-width:200px;">
+            <option value="all">Todos</option>
+            <option value="active">Ativos</option>
+            <option value="inactive">Inativos</option>
+          </select>
+        </div>
+
         <div class="table-responsive">
           <table class="table">
             <thead>
@@ -99,7 +120,7 @@ export async function renderProductsPage() {
               </tr>
             </thead>
             <tbody>
-              ${renderProductsRows(rows)}
+              ${renderProductsRows(filteredRows)}
             </tbody>
           </table>
         </div>
@@ -108,7 +129,34 @@ export async function renderProductsPage() {
   `;
 
   const tableBody = app.querySelector('tbody');
-  if (!tableBody) return;
+  const searchInput = app.querySelector('#products-search');
+  const statusSelect = app.querySelector('#products-status-filter');
+  if (!tableBody || !searchInput || !statusSelect) return;
+
+  function applyFilters() {
+    const normalizedQuery = searchTerm.trim().toLowerCase();
+
+    filteredRows = allRows.filter((product) => {
+      const matchesSearch =
+        !normalizedQuery ||
+        String(product.code ?? '')
+          .toLowerCase()
+          .includes(normalizedQuery) ||
+        String(product.name ?? '')
+          .toLowerCase()
+          .includes(normalizedQuery);
+
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && product.is_active === true) ||
+        (statusFilter === 'inactive' && product.is_active === false);
+
+      return matchesSearch && matchesStatus;
+    });
+
+    tableBody.innerHTML = renderProductsRows(filteredRows);
+    attachRowEvents();
+  }
 
   function attachRowEvents() {
     app.querySelectorAll('.btn-edit-product').forEach((button) => {
@@ -129,12 +177,11 @@ export async function renderProductsPage() {
         button.disabled = true;
         try {
           const updatedProduct = await toggleProductActive(productId, isActive);
-          const rowIndex = rows.findIndex((row) => String(row.id) === String(productId));
+          const rowIndex = allRows.findIndex((row) => String(row.id) === String(productId));
 
           if (rowIndex >= 0) {
-            rows[rowIndex] = normalizeProduct(updatedProduct, rowIndex);
-            tableBody.innerHTML = renderProductsRows(rows);
-            attachRowEvents();
+            allRows[rowIndex] = normalizeProduct(updatedProduct, rowIndex);
+            applyFilters();
           }
         } catch {
           button.disabled = false;
@@ -142,6 +189,21 @@ export async function renderProductsPage() {
       });
     });
   }
+
+  searchInput.addEventListener('input', (event) => {
+    const nextValue = event.target?.value ?? '';
+
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      searchTerm = nextValue;
+      applyFilters();
+    }, 300);
+  });
+
+  statusSelect.addEventListener('change', (event) => {
+    statusFilter = event.target?.value ?? 'all';
+    applyFilters();
+  });
 
   attachRowEvents();
 }
