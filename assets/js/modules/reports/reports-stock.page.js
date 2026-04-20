@@ -1,4 +1,4 @@
-import { getInventoryBalances } from '../../services/inventory.service.js';
+import { getInventoryBalances, syncInventoryProducts } from '../../services/inventory.service.js';
 
 import {
   escapeHtml,
@@ -141,6 +141,8 @@ function bindEvents() {
 export async function renderReportsStockPage() {
   const appRoot = document.querySelector('#app');
   if (!appRoot) return;
+
+  await syncInventoryProducts();
 
   const rows = applyFilters(getInventoryBalances());
 

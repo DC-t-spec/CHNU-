@@ -3,6 +3,7 @@ import {
   searchInventoryLedger,
   paginateInventoryRows,
   getInventoryFilterOptions,
+  syncInventoryProducts,
 } from '../../services/inventory.service.js';
 
 import {
@@ -265,6 +266,8 @@ export async function renderInventoryLedgerPage() {
     sortBy: 'date_desc',
     page: 1,
   });
+
+  await syncInventoryProducts();
 
   const summary = getInventoryLedgerSummary();
   const options = getInventoryFilterOptions();

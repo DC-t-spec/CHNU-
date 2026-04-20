@@ -1,4 +1,4 @@
-import { getInventoryLedger } from '../../services/inventory.service.js';
+import { getInventoryLedger, syncInventoryProducts } from '../../services/inventory.service.js';
 
 import {
   escapeHtml,
@@ -220,6 +220,8 @@ function bindEvents() {
 export async function renderReportsMovementsPage() {
   const appRoot = document.querySelector('#app');
   if (!appRoot) return;
+
+  await syncInventoryProducts();
 
   const allMovements = getInventoryLedger();
   const filteredRows = applyMovementFilters(allMovements);

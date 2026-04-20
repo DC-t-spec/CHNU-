@@ -1,6 +1,7 @@
 import {
   getInventoryBalanceSummary,
   getInventoryLedger,
+  syncInventoryProducts,
 } from '../../services/inventory.service.js';
 
 import {
@@ -91,6 +92,8 @@ function renderRecentMovementsTable(rows) {
 export async function renderReportsDashboardPage() {
   const appRoot = document.querySelector('#app');
   if (!appRoot) return;
+
+  await syncInventoryProducts();
 
   const summary = getInventoryBalanceSummary();
   const recentMoves = getInventoryLedger()
