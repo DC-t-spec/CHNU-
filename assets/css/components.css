@@ -811,6 +811,12 @@
   border-bottom: none;
 }
 
+.table-meta {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+
 .documents-stats-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -854,11 +860,60 @@
 }
 
 .inventory-ledger-page .toolbar--filters {
-  grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto;
+  grid-template-columns: 2fr 1fr auto;
 }
 
 .inventory-balances-page .toolbar--filters {
   grid-template-columns: 2fr 1fr 1fr auto;
+}
+
+.inventory-balances-page .toolbar-card,
+.inventory-ledger-page .toolbar-card {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid #dbe5f2;
+}
+
+.inventory-balances-page .toolbar__label,
+.inventory-ledger-page .toolbar__label {
+  color: #475569;
+}
+
+.inventory-balances-page .toolbar__input,
+.inventory-balances-page .toolbar__select,
+.inventory-ledger-page .toolbar__input,
+.inventory-ledger-page .toolbar__select {
+  background: #ffffff;
+  border: 1px solid #c7d5e6;
+  color: #0f172a;
+  font-weight: 500;
+  -webkit-text-fill-color: #0f172a;
+}
+
+.inventory-balances-page .toolbar__input::placeholder,
+.inventory-ledger-page .toolbar__input::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+
+.inventory-balances-page .toolbar__select option,
+.inventory-ledger-page .toolbar__select option {
+  color: #0f172a;
+  background: #ffffff;
+}
+
+.inventory-balances-page .toolbar__input:hover,
+.inventory-balances-page .toolbar__select:hover,
+.inventory-ledger-page .toolbar__input:hover,
+.inventory-ledger-page .toolbar__select:hover {
+  border-color: #94a3b8;
+}
+
+.inventory-balances-page .toolbar__input:focus,
+.inventory-balances-page .toolbar__select:focus,
+.inventory-ledger-page .toolbar__input:focus,
+.inventory-ledger-page .toolbar__select:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.16);
 }
 
 @media (max-width: 1200px) {

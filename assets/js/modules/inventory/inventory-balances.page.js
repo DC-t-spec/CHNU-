@@ -5,7 +5,7 @@ import {
   resetInventoryPageFilters,
 } from './inventory-filters.js';
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 10;
 
 function formatNumber(value) {
   return new Intl.NumberFormat('pt-PT').format(Number(value || 0));
@@ -33,10 +33,10 @@ function getStockStatusBadge(status) {
   }
 
   if (status === 'low') {
-    return `<span class="status-pill status-pill--warning">Stock baixo</span>`;
+    return `<span class="status-pill status-pill--warning">Baixo</span>`;
   }
 
-  return `<span class="status-pill status-pill--success">Saudável</span>`;
+  return `<span class="status-pill status-pill--success">Normal</span>`;
 }
 
 function renderSummaryCards(summary) {
@@ -48,18 +48,8 @@ function renderSummaryCards(summary) {
       </article>
 
       <article class="documents-stat-card">
-        <span class="documents-stat-card__label">Qty on hand</span>
+        <span class="documents-stat-card__label">Stock atual total</span>
         <strong class="documents-stat-card__value">${formatNumber(summary.total_qty_on_hand)}</strong>
-      </article>
-
-      <article class="documents-stat-card">
-        <span class="documents-stat-card__label">Qty available</span>
-        <strong class="documents-stat-card__value">${formatNumber(summary.total_qty_available)}</strong>
-      </article>
-
-      <article class="documents-stat-card">
-        <span class="documents-stat-card__label">Valor total stock</span>
-        <strong class="documents-stat-card__value">${formatCurrency(summary.total_stock_value)}</strong>
       </article>
 
       <article class="documents-stat-card">
@@ -68,14 +58,14 @@ function renderSummaryCards(summary) {
       </article>
 
       <article class="documents-stat-card">
-        <span class="documents-stat-card__label">Stock baixo</span>
-        <strong class="documents-stat-card__value">${formatNumber(summary.total_low_stock)}</strong>
+        <span class="documents-stat-card__label">Valor total stock</span>
+        <strong class="documents-stat-card__value">${formatCurrency(summary.total_stock_value)}</strong>
       </article>
     </section>
   `;
 }
 
-function renderFilters(filters, options) {
+function renderFilters(filters) {
   return `
     <div class="card toolbar-card">
       <form class="toolbar toolbar--filters" id="inventory-balances-filters-form">
@@ -86,27 +76,9 @@ function renderFilters(filters, options) {
             name="query"
             class="toolbar__input"
             type="text"
-            placeholder="Produto, SKU ou armazém"
+            placeholder="Code ou name"
             value="${escapeHtml(filters.query || '')}"
           />
-        </div>
-
-        <div class="toolbar__group">
-          <label class="toolbar__label" for="inventory-balances-warehouse">Armazém</label>
-          <select
-            id="inventory-balances-warehouse"
-            name="warehouse"
-            class="toolbar__select"
-          >
-            <option value="">Todos</option>
-            ${(options.warehouses || [])
-              .map(
-                (item) => `
-                  <option value="${escapeHtml(item)}" ${filters.warehouse === item ? 'selected' : ''}>${escapeHtml(item)}</option>
-                `
-              )
-              .join('')}
-          </select>
         </div>
 
         <div class="toolbar__group">
@@ -117,9 +89,9 @@ function renderFilters(filters, options) {
             class="toolbar__select"
           >
             <option value="" ${filters.status === '' ? 'selected' : ''}>Todos</option>
+            <option value="ok" ${filters.status === 'ok' ? 'selected' : ''}>Normal</option>
+            <option value="low" ${filters.status === 'low' ? 'selected' : ''}>Baixo</option>
             <option value="out" ${filters.status === 'out' ? 'selected' : ''}>Sem stock</option>
-            <option value="low" ${filters.status === 'low' ? 'selected' : ''}>Stock baixo</option>
-            <option value="ok" ${filters.status === 'ok' ? 'selected' : ''}>Saudável</option>
           </select>
         </div>
 
@@ -132,12 +104,8 @@ function renderFilters(filters, options) {
           >
             <option value="product_asc" ${filters.sortBy === 'product_asc' ? 'selected' : ''}>Produto A-Z</option>
             <option value="product_desc" ${filters.sortBy === 'product_desc' ? 'selected' : ''}>Produto Z-A</option>
-            <option value="warehouse_asc" ${filters.sortBy === 'warehouse_asc' ? 'selected' : ''}>Armazém A-Z</option>
-            <option value="warehouse_desc" ${filters.sortBy === 'warehouse_desc' ? 'selected' : ''}>Armazém Z-A</option>
-            <option value="qty_desc" ${filters.sortBy === 'qty_desc' ? 'selected' : ''}>Maior stock</option>
-            <option value="qty_asc" ${filters.sortBy === 'qty_asc' ? 'selected' : ''}>Menor stock</option>
-            <option value="value_desc" ${filters.sortBy === 'value_desc' ? 'selected' : ''}>Maior valor</option>
-            <option value="value_asc" ${filters.sortBy === 'value_asc' ? 'selected' : ''}>Menor valor</option>
+            <option value="qty_desc" ${filters.sortBy === 'qty_desc' ? 'selected' : ''}>Stock atual ↓</option>
+            <option value="qty_asc" ${filters.sortBy === 'qty_asc' ? 'selected' : ''}>Stock atual ↑</option>
           </select>
         </div>
 
@@ -168,14 +136,10 @@ function renderBalancesTable(rows) {
         <table class="table">
           <thead>
             <tr>
-              <th>Produto</th>
-              <th>SKU</th>
-              <th>Armazém</th>
-              <th>Qty on hand</th>
-              <th>Qty reserved</th>
-              <th>Qty available</th>
-              <th>Custo médio</th>
-              <th>Custo total</th>
+              <th>Code</th>
+              <th>Name</th>
+              <th>Stock atual</th>
+              <th>Stock mínimo</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -184,14 +148,10 @@ function renderBalancesTable(rows) {
               .map(
                 (row) => `
                   <tr>
+                    <td>${escapeHtml(row.product_code)}</td>
                     <td>${escapeHtml(row.product_name)}</td>
-                    <td>${escapeHtml(row.product_sku)}</td>
-                    <td>${escapeHtml(row.warehouse_name)}</td>
                     <td>${formatNumber(row.qty_on_hand)}</td>
-                    <td>${formatNumber(row.qty_reserved)}</td>
-                    <td>${formatNumber(row.qty_available)}</td>
-                    <td>${formatCurrency(row.avg_unit_cost)}</td>
-                    <td>${formatCurrency(row.total_cost)}</td>
+                    <td>${formatNumber(row.product_min_qty)}</td>
                     <td>${getStockStatusBadge(row.stock_status)}</td>
                   </tr>
                 `
@@ -245,7 +205,6 @@ function bindBalancesPageEvents(pagination) {
 
     updateInventoryPageFilters({
       query: formData.get('query') || '',
-      warehouse: formData.get('warehouse') || '',
       status: formData.get('status') || '',
       sortBy: formData.get('sortBy') || 'product_asc',
       page: 1,
@@ -253,7 +212,7 @@ function bindBalancesPageEvents(pagination) {
   });
 
   resetButton?.addEventListener('click', () => {
-    resetInventoryPageFilters(['query', 'warehouse', 'status', 'sortBy', 'page']);
+    resetInventoryPageFilters(['query', 'status', 'sortBy', 'page']);
   });
 
   prevButton?.addEventListener('click', () => {
@@ -279,15 +238,13 @@ export async function renderInventoryBalancesPage() {
 
   const filters = getInventoryPageFilters({
     query: '',
-    warehouse: '',
     status: '',
     sortBy: 'product_asc',
     page: 1,
   });
 
-  const { summary, options, items, pagination } = getInventoryBalancesPageData({
+  const { summary, items, pagination } = getInventoryBalancesPageData({
     query: filters.query,
-    warehouse: filters.warehouse,
     status: filters.status,
     sortBy: filters.sortBy,
     page: filters.page,
@@ -299,12 +256,12 @@ export async function renderInventoryBalancesPage() {
       <section class="page-header">
         <div>
           <h1>Inventory Balances</h1>
-          <p>Visão actual dos saldos de stock por produto e armazém.</p>
+          <p>Visão actual do stock por produto.</p>
         </div>
       </section>
 
       ${renderSummaryCards(summary)}
-      ${renderFilters(filters, options)}
+      ${renderFilters(filters)}
       ${renderBalancesTable(items)}
       ${renderPagination(pagination)}
     </section>
