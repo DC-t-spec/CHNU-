@@ -1,6 +1,8 @@
 import { listProductsAsync, toggleProductActive } from '../../services/products.service.js';
 import { navigateTo } from '../../core/router.js';
 
+const PAGE_SIZE = 10;
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -33,11 +35,19 @@ function normalizeProduct(product, index) {
   };
 }
 
+function renderProductStatusBadge(isActive) {
+  return `
+    <span class="products-status-badge ${isActive ? 'products-status-badge--active' : 'products-status-badge--inactive'}">
+      ${isActive ? 'Ativo' : 'Inativo'}
+    </span>
+  `;
+}
+
 function renderProductsRows(rows) {
   if (!rows.length) {
     return `
       <tr>
-        <td colspan="4" style="text-align:center;">Sem produtos disponíveis.</td>
+        <td colspan="5" class="products-empty-cell">Sem produtos disponíveis.</td>
       </tr>
     `;
   }
@@ -46,20 +56,23 @@ function renderProductsRows(rows) {
     .map(
       (row) => `
         <tr data-product-id="${escapeHtml(row.id)}">
-          <td>${escapeHtml(row.code)}</td>
-          <td>${escapeHtml(row.name)}</td>
-          <td style="text-align:right;">${formatCurrency(row.unitPrice)}</td>
-          <td style="text-align:right;">
-            <button type="button" class="btn btn-secondary btn-edit-product" data-product-id="${escapeHtml(row.id)}" ${row.id ? '' : 'disabled'}>Editar</button>
-            <button
-              type="button"
-              class="btn ${row.is_active ? 'btn-danger' : 'btn-primary'} btn-toggle-product-active"
-              data-product-id="${escapeHtml(row.id)}"
-              data-is-active="${row.is_active ? 'true' : 'false'}"
-              ${row.id ? '' : 'disabled'}
-            >
-              ${row.is_active ? 'Desativar' : 'Ativar'}
-            </button>
+          <td class="products-col-code">${escapeHtml(row.code)}</td>
+          <td class="products-col-name">${escapeHtml(row.name)}</td>
+          <td class="products-col-status">${renderProductStatusBadge(row.is_active)}</td>
+          <td class="products-col-price">${formatCurrency(row.unitPrice)}</td>
+          <td class="products-col-actions">
+            <div class="table-actions products-actions">
+              <button type="button" class="btn btn-secondary btn-sm btn-edit-product" data-product-id="${escapeHtml(row.id)}" ${row.id ? '' : 'disabled'}>Editar</button>
+              <button
+                type="button"
+                class="btn btn-sm ${row.is_active ? 'btn-danger' : 'btn-primary'} btn-toggle-product-active"
+                data-product-id="${escapeHtml(row.id)}"
+                data-is-active="${row.is_active ? 'true' : 'false'}"
+                ${row.id ? '' : 'disabled'}
+              >
+                ${row.is_active ? 'Desativar' : 'Ativar'}
+              </button>
+            </div>
           </td>
         </tr>
       `
@@ -113,7 +126,7 @@ export async function renderProductsPage() {
 
   app.innerHTML = `
     <section class="page-shell products-page">
-      <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;">
+      <div class="page-header products-page__header">
         <div>
           <h1>Products</h1>
           <p>Consulta de produtos cadastrados no sistema.</p>
@@ -151,14 +164,15 @@ export async function renderProductsPage() {
           </select>
         </div>
 
-        <div class="table-responsive">
-          <table class="table">
+        <div class="table-responsive products-table-wrap">
+          <table class="data-table products-table">
             <thead>
               <tr>
                 <th>Code</th>
                 <th>Name</th>
-                <th style="text-align:right;">Unit price</th>
-                <th style="text-align:right;">Ações</th>
+                <th>Status</th>
+                <th class="products-th-price">Unit price</th>
+                <th class="products-th-actions">Ações</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -233,7 +247,6 @@ export async function renderProductsPage() {
       button.addEventListener('click', async () => {
         const productId = button.getAttribute('data-product-id');
         const isActive = button.getAttribute('data-is-active') === 'true';
-
         if (!productId) return;
 
         button.disabled = true;
@@ -250,6 +263,27 @@ export async function renderProductsPage() {
         }
       });
     });
+  }
+
+  function renderTable() {
+    const processedRows = getProcessedRows();
+    const totalItems = processedRows.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+
+    if (currentPage > totalPages) {
+      currentPage = totalPages;
+    }
+
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const pagedRows = processedRows.slice(start, start + PAGE_SIZE);
+
+    tableBody.innerHTML = renderProductsRows(pagedRows);
+    totalResults.textContent = `${totalItems} produto${totalItems === 1 ? '' : 's'}`;
+    paginationInfo.textContent = `Página ${currentPage} de ${totalPages}`;
+    prevPageButton.disabled = currentPage <= 1;
+    nextPageButton.disabled = currentPage >= totalPages;
+
+    attachRowEvents();
   }
 
   searchInput.addEventListener('input', (event) => {
