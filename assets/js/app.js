@@ -10,6 +10,9 @@ import { renderInventoryLedgerPage } from './modules/inventory/inventory-ledger.
 import { renderProductsPage } from './modules/products/products.page.js';
 import { renderProductFormPage } from './modules/products/product-form.js';
 import { renderProductEditPage } from './modules/products/product-edit.page.js';
+import { renderReportsDashboardPage } from './modules/reports/reports-dashboard.page.js';
+import { renderReportsStockPage } from './modules/reports/reports-stock.page.js';
+import { renderReportsMovementsPage } from './modules/reports/reports-movements.page.js';
 
 function redirectToDashboard() {
   navigateTo('#dashboard');
@@ -31,6 +34,10 @@ function bootstrapRoutes() {
   registerRoute('/products', renderProductsPage);
   registerRoute('/products/new', renderProductFormPage);
   registerRoute('/products/edit/:id', renderProductEditPage);
+
+  registerRoute('/reports', renderReportsDashboardPage);
+  registerRoute('/reports-stock', renderReportsStockPage);
+  registerRoute('/reports-movements', renderReportsMovementsPage);
 }
 
 function bootstrapApp() {
